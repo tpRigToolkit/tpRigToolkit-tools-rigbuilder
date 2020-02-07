@@ -1,0 +1,30 @@
+language: python
+before_install:
+- pip install pycodestyle
+install:
+- pip install -r requirements.txt
+- python setup.py install
+script:
+- find . -name \*.py -exec pycodestyle --max-line-length=120 --ignore=E402 {} +
+- pytest --cov=tpRigToolkit
+- sphinx-apidoc -f -e -o docs/sphinx tpRigToolkit
+- sphinx-build -M html ./docs/sphinx ./
+after_success:
+- coveralls
+- cd html && touch .nojekyll && cd ../
+deploy:
+  - provider: pages
+    skip_cleanup: true
+    github_token: "$GITHUB_TOKEN"
+    keep_history: true
+    local_dir: html
+    on:
+      branch: master
+  - provider: pypi
+    skip_cleanup: true
+    user: tpoveda
+    password:
+      secure: dGaZ5kzg4mzrNgPohMiJY/tQBqW5jzmZOWFejflarWDErf2vvIhKER+Qs6bqwp8n9swA9eSgfGOexNQ8wvei0yCQGPAGS+Qsq8DNLz6ocbNQmSUogIf67PKzUbPE1bkPCyK/BlOoDKVQfmapZRF0+mVmZfDR67528Se/joN4EnpRDfpa3isFjI213v4HJUIfUYqcDz+JEFVr8mCoiAsRpXqqDH7bTvnyEhGpUiTVe3w6MUVJX9eM/Xga00NVONbQCptceLmxhYx+hCzDp3O4esc48+Py6eQMEKsMywLnvCzP/yiXwjq+1+Muc9HV1kmJS+IhnTv/WFhd+xqwPtKCp8fDuHArmcUq6AHS1FQ2FS3xuNYAzHrup4q+/JafuY8BF5f1ywlMpMM4WKSr4Kygmdgh93fGPhHX3Sf4cFUFoWc9ivarCI83kxBfkc0LAfmrlEaCctOQb5AbTYkYSfT0nt7/H4nkSsgHmYPVZ3LMz9mQxtGs0ykX8k89+hhcFYWy53N06DQ6kn5oPkT1g9WlZEl3UTg7KGB30E9oRlmtFIoBwi7gc1PbcVj/TjJGwqEn/9dTTZaHiDUY7s855EhXe1YbUIl5HGO4IYEQ3v1TvR252GkE9Y47pUQRw/7PuALLCEaXOH6vmHZkkhqPHcY7FeZywK8n6RVC+mIeuC54EXA=
+    on:
+      branch: master
+      tags: true
