@@ -1,0 +1,17 @@
+tpRigToolkit.tools.rigbuilder package
+=====================================
+
+Subpackages
+-----------
+
+.. toctree::
+
+   tpRigToolkit.tools.rigbuilder.core
+
+Module contents
+---------------
+
+.. automodule:: tpRigToolkit.tools.rigbuilder
+   :members:
+   :undoc-members:
+   :show-inheritance:
