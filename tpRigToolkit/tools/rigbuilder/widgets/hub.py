@@ -5,10 +5,14 @@
 Module that contains rig widget for RigBuilder
 """
 
+import logging
+
 import tpQtLib
 from tpQtLib.core import tool
 
-from tpRigToolkit.tools.rigbuilder.tools import datalibrary
+from tpRigToolkit.tools.rigbuilder.tools import datalibrary, controls
+
+LOGGER = logging.getLogger('tpRigToolkit')
 
 
 class HubWidget(tpQtLib.Window, object):
@@ -20,7 +24,7 @@ class HubWidget(tpQtLib.Window, object):
         self._progress_bar = progress_bar
         self._tools_classes = list()
 
-        for tool_class in [datalibrary.DataLibrary]:
+        for tool_class in [datalibrary.DataLibrary, controls.ControlsTool]:
             self.register_tool_class(tool_class)
 
         super(HubWidget, self).__init__(
@@ -131,6 +135,7 @@ class HubWidget(tpQtLib.Window, object):
                 tool_class = t
                 break
         if not tool_class:
+            LOGGER.warning('No registered tool found with name: "{}"'.format(tool_name))
             return None
 
         tool_instance = tool.create_tool_instance(tool_class, self._tools)

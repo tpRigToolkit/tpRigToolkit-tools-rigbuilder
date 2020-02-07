@@ -13,11 +13,13 @@ __maintainer__ = "Tomas Poveda"
 __email__ = "tpovedatd@gmail.com"
 
 import logging
+from functools import partial
 
 from tpQtLib.core import tool, qtutils
-from tpQtLib.widgets import splitters, stack
+from tpQtLib.widgets import stack
 
 import tpRigToolkit
+from tpRigToolkit.tools import rigbuilder
 from tpRigToolkit.tools.rigbuilder.widgets import project, hub, console
 
 LOGGER = logging.getLogger('tpRigToolkit')
@@ -73,6 +75,7 @@ class RigBuilderTool(tpRigToolkit.Tool, object):
 
         self._project = project
         self._hub_widget.set_project(project)
+        rigbuilder.project = project
 
     def get_console(self):
         """
@@ -111,8 +114,9 @@ class RigBuilderTool(tpRigToolkit.Tool, object):
                 icon = tool_class.icon()
                 if icon:
                     show_tool_action.setIcon(icon)
-                show_tool_action.triggered.connect(
-                    lambda tool_name=tool_class.NAME: self._rig_widget.invoke_dock_tool_by_name(tool_name))
+                show_tool_action.triggered.connect(partial(self._hub_widget.invoke_dock_tool_by_name, tool_class.NAME))
+                # show_tool_action.triggered.connect(
+                #     lambda tool_name=tool_class.NAME: self._hub_widget.invoke_dock_tool_by_name(tool_name))
                 settings.beginGroup('DockTools')
                 child_groups = settings.childGroups()
                 for dock_tool_group_name in child_groups:
@@ -120,7 +124,7 @@ class RigBuilderTool(tpRigToolkit.Tool, object):
                     if dock_tool_group_name in [t.unique_name() for t in self._tools]:
                         continue
                     tool_name = dock_tool_group_name.split('::')[0]
-                    self._rig_widget.invoke_dock_tool_by_name(tool_name, settings)
+                    self._hub_widget.invoke_dock_tool_by_name(tool_name, settings)
                     settings.endGroup()
                 settings.endGroup()
 
