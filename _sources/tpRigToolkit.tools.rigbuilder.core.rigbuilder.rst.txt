@@ -1,0 +1,7 @@
+tpRigToolkit.tools.rigbuilder.core.rigbuilder module
+====================================================
+
+.. automodule:: tpRigToolkit.tools.rigbuilder.core.rigbuilder
+   :members:
+   :undoc-members:
+   :show-inheritance:

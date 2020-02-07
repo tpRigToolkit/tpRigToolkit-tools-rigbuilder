@@ -1,6 +1,13 @@
 tpRigToolkit.tools.rigbuilder.core package
 ==========================================
 
+Submodules
+----------
+
+.. toctree::
+
+   tpRigToolkit.tools.rigbuilder.core.rigbuilder
+
 Module contents
 ---------------
 
