@@ -9,8 +9,10 @@ import logging
 
 import tpQtLib
 from tpQtLib.core import tool
+from tpQtLib.widgets import tabs
 
-from tpRigToolkit.tools.rigbuilder.tools import datalibrary, controls
+from tpRigToolkit.tools.rigbuilder.tools import datalibrary, controls, blueprintseditor
+
 
 LOGGER = logging.getLogger('tpRigToolkit')
 
@@ -24,7 +26,7 @@ class HubWidget(tpQtLib.Window, object):
         self._progress_bar = progress_bar
         self._tools_classes = list()
 
-        for tool_class in [datalibrary.DataLibrary, controls.ControlsTool]:
+        for tool_class in [datalibrary.DataLibrary, controls.ControlsTool, blueprintseditor.BlueprintsEditor]:
             self.register_tool_class(tool_class)
 
         super(HubWidget, self).__init__(
@@ -87,6 +89,22 @@ class HubWidget(tpQtLib.Window, object):
 
         self._console = console
 
+    def get_progress_bar(self):
+        """
+        Returns progress bar linked to this widget
+        :return: ProgressBar
+        """
+
+        return self._progress_bar
+
+    def set_progress_bar(self, progress_bar):
+        """
+        Sets the progress bar linked to this widget
+        :param progress_bar: ProgressBar
+        """
+
+        self._progress_bar = progress_bar
+
     def data_library(self):
         """
         Returns data library widget
@@ -94,7 +112,6 @@ class HubWidget(tpQtLib.Window, object):
         """
 
         data_library = self.invoke_dock_tool_by_name('Data Library')
-        data_library.setEnabled(False)
         self.set_library(data_library)
 
         return data_library
