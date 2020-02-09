@@ -263,6 +263,37 @@ class ScriptTree(buildtree.BuildTree, object):
             self.scriptOpened.emit(item, False, False)
         settings.endGroup()
 
+    def refresh(self, sync=False, scripts_and_states=list()):
+        """
+        Overrides base treewidgets.FileTreeWidget refresh function
+        """
+
+        if self._break_item:
+            break_item_path = self._get_item_path_name(self._break_item, keep_extension=True)
+        if self._start_item:
+            start_item_path = self._get_item_path_name(self._start_item, keep_extension=True)
+
+        if sync:
+            self._sync_scripts()
+
+        orig_scripts_manifest_update = self._allow_scripts_manifest_update
+        self._allow_scripts_manifest_update = False
+        if scripts_and_states:
+            self._custom_refresh(scripts_and_states[0], scripts_and_states[1])
+        else:
+            super(ScriptTree, self).refresh()
+        self._allow_scripts_manifest_update = orig_scripts_manifest_update
+
+        if self._start_item:
+            item = self._get_item_by_name(start_item_path)
+            if item:
+                self.set_start_point(item)
+
+        if self._break_item:
+            item = self._get_item_by_name(break_item_path)
+            if item:
+                self.set_break_point(item)
+
     def _get_invalid_code_names(self):
         """
         Overrides base BuildTree _get_invalid_code_names function
@@ -452,41 +483,6 @@ class ScriptTree(buildtree.BuildTree, object):
         new_data_import_action.triggered.connect(self._on_create_data_import)
         browse_action.triggered.connect(self._on_browse_code)
         refresh_action.triggered.connect(self._on_refresh)
-
-    # ================================================================================================
-    # ======================== BASE
-    # ================================================================================================
-
-    def refresh(self, sync=False, scripts_and_states=list()):
-        """
-        Overrides base treewidgets.FileTreeWidget refresh function
-        """
-
-        if self._break_item:
-            break_item_path = self._get_item_path_name(self._break_item, keep_extension=True)
-        if self._start_item:
-            start_item_path = self._get_item_path_name(self._start_item, keep_extension=True)
-
-        if sync:
-            self._sync_scripts()
-
-        orig_scripts_manifest_update = self._allow_scripts_manifest_update
-        self._allow_scripts_manifest_update = False
-        if scripts_and_states:
-            self._custom_refresh(scripts_and_states[0], scripts_and_states[1])
-        else:
-            super(ScriptTree, self).refresh()
-        self._allow_scripts_manifest_update = orig_scripts_manifest_update
-
-        if self._start_item:
-            item = self._get_item_by_name(start_item_path)
-            if item:
-                self.set_start_point(item)
-
-        if self._break_item:
-            item = self._get_item_by_name(break_item_path)
-            if item:
-                self.set_break_point(item)
 
     # ================================================================================================
     # ======================== MANIFEST

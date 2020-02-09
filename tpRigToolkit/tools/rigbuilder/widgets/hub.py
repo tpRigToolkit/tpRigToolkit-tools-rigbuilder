@@ -5,13 +5,18 @@
 Module that contains rig widget for RigBuilder
 """
 
+from __future__ import print_function, division, absolute_import
+
 import logging
+
+from Qt.QtCore import *
+from Qt.QtWidgets import *
 
 import tpQtLib
 from tpQtLib.core import tool
-from tpQtLib.widgets import tabs
 
-from tpRigToolkit.tools.rigbuilder.tools import datalibrary, controls, blueprintseditor
+from tpRigToolkit.tools.rigbuilder.widgets import builder, outliner
+from tpRigToolkit.tools.rigbuilder.tools import datalibrary, controls, blueprintseditor, properties
 
 
 LOGGER = logging.getLogger('tpRigToolkit')
@@ -26,7 +31,10 @@ class HubWidget(tpQtLib.Window, object):
         self._progress_bar = progress_bar
         self._tools_classes = list()
 
-        for tool_class in [datalibrary.DataLibrary, controls.ControlsTool, blueprintseditor.BlueprintsEditor]:
+        # TODO: Tool registration should be automatic
+        for tool_class in [
+            datalibrary.DataLibrary, controls.ControlsTool, properties.PropertiesTool,
+            blueprintseditor.BlueprintsEditor]:
             self.register_tool_class(tool_class)
 
         super(HubWidget, self).__init__(
@@ -54,6 +62,18 @@ class HubWidget(tpQtLib.Window, object):
 
         self.setAcceptDrops(True)
 
+        self._outliner = outliner.RigOutliner(settings=self._settings, project=self._project, console=self._console)
+        self._builder = builder.RigBuilder(settings=self._settings, project=self._project, console=self._console)
+
+        main_splitter = QSplitter(self)
+        main_splitter.setOrientation(Qt.Horizontal)
+        main_splitter.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.main_layout.addWidget(main_splitter)
+
+        main_splitter.addWidget(self._outliner)
+        main_splitter.addWidget(self._builder)
+        main_splitter.setSizes([1, 1])
+
     def get_project(self):
         """
         Returns current project opened in rigbuilder
@@ -69,6 +89,11 @@ class HubWidget(tpQtLib.Window, object):
         """
 
         self._project = project
+        self._outliner.set_project(project)
+        self._builder.set_project(project)
+
+        properties_widget = self.properties_widget()
+        properties_widget.set_project(project)
 
         data_library = self.data_library()
         data_library.set_project(project)
@@ -104,6 +129,16 @@ class HubWidget(tpQtLib.Window, object):
         """
 
         self._progress_bar = progress_bar
+
+    def properties_widget(self):
+        """
+        Returns properties widget
+        :return: PropertiesTool
+        """
+
+        properties_widget = self.invoke_dock_tool_by_name('Properties')
+
+        return properties_widget
 
     def data_library(self):
         """

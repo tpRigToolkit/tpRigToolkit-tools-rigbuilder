@@ -367,8 +367,6 @@ class BuildTree(treewidgets.FileTreeWidget, object):
         self._hierarchy = True
 
         self._context_menu = None
-        self._new_actions = list()
-        self._edit_actions = list()
 
         self.setSortingEnabled(False)
         self.setSelectionMode(self.ExtendedSelection)
@@ -457,6 +455,9 @@ class BuildTree(treewidgets.FileTreeWidget, object):
         else:
             event.ignore()
 
+    def refresh(self):
+        print('adsfasdfasdf')
+
     def _add_item(self, file_name, state, parent=None, **kwargs):
         """
         Internal function that adds a new item to the script tree
@@ -476,6 +477,23 @@ class BuildTree(treewidgets.FileTreeWidget, object):
         self._setup_item(item, state)
 
         return item
+
+    def _add_items(self, files, item=None):
+        """
+        Overrides base BuildTree _add_items function
+        Internal function used to add new scripts file to the given script item
+        :param files: list(str)
+        :param item: ScriptItem
+        """
+
+        print(files)
+
+        # scripts, states, parents = files
+        # script_count = len(scripts)
+        # found_false = False
+        # built_parents = dict()
+        #
+        # print('gogogog')
 
     def _get_ancestors(self, item):
         """
@@ -767,11 +785,7 @@ class BuildTree(treewidgets.FileTreeWidget, object):
 
         self._context_menu = QMenu()
 
-        self._new_actions = self._create_actions(self._context_menu)
-        # self._context_menu.addSeparator()
-        # self._edit_actions = self._create_edit_actions(self._context_menu)
-        # self._context_menu.addSeparator()
-        # self._create_extra_actions(self._context_menu)
+        self._create_actions(self._context_menu)
 
     def _create_actions(self, context_menu):
         """
@@ -780,36 +794,6 @@ class BuildTree(treewidgets.FileTreeWidget, object):
         """
 
         return None
-
-    # def _create_extra_actions(self, context_menu):
-    #     """
-    #     Internal function that creates extra actions
-    #     :param context_menu: QMenu
-    #     """
-    #
-    #     log_icon = resource.ResourceManager().icon('document')
-    #     new_window_icon = resource.ResourceManager().icon('new_window')
-    #     external_icon = resource.ResourceManager().icon('external')
-    #     start_point_icon = resource.ResourceManager().icon('finish_flag')
-    #     break_point_icon = resource.ResourceManager().icon('record')
-    #     cancel_start_point_icon = resource.ResourceManager().icon('cancel_start_point')
-    #     cancel_break_point_icon = resource.ResourceManager().icon('cancel_break_point')
-    #     cancel_start_break_points_icon = resource.ResourceManager().icon('cancel_start_break_points')
-    #
-    #     log_window = self._context_menu.addAction(log_icon, 'Show Last Log')
-    #     new_window_action = self._context_menu.addAction(new_window_icon, 'Open in New Window')
-    #     external_window_action = self._context_menu.addAction(external_icon, 'Open in External')
-    #     browse_action = self._context_menu.addAction(browse_icon, 'Browse')
-    #     refresh_action = self._context_menu.addAction(refresh_icon, 'Refresh')
-    #     self._context_menu.addSeparator()
-    #     start_action = self._context_menu.addAction(start_point_icon, 'Set Start Point')
-    #     self._cancel_start_action = self._context_menu.addAction(cancel_start_point_icon, 'Cancel Start Point')
-    #     self._context_menu.addSeparator()
-    #     break_action = self._context_menu.addAction(break_point_icon, 'Set Break Point')
-    #     self._cancel_break_point = self._context_menu.addAction(cancel_break_point_icon, 'Cancel Break Point')
-    #     self._context_menu.addSeparator()
-    #     self._cancel_points_action = self._context_menu.addAction(cancel_start_break_points_icon,
-    #                                                               'Cancel Start/Break Points')
 
     def _edit_actions_visible(self, flag):
         """
@@ -1064,6 +1048,10 @@ class BuildTree(treewidgets.FileTreeWidget, object):
         menu for that item
         :param pos: QPos
         """
+
+        current_object = self.object()
+        if not current_object:
+            return
 
         items = self.selectedItems()
         item = None
