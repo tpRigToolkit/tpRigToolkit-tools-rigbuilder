@@ -21,11 +21,12 @@ from tpPyUtils import folder, fileio, version, path as path_utils, name as name_
 
 from tpRigToolkit.tools import rigbuilder
 from tpRigToolkit.tools.rigbuilder.core import consts, data
+from tpRigToolkit.tools.rigbuilder.objects import build
 
 LOGGER = logging.getLogger('tpRigToolkit')
 
 
-class ScriptObject(BuildObject, object):
+class ScriptObject(build.BuildObject, object):
 
     CODE_FOLDER = consts.CODE_FOLDER
     MANIFEST_FILE = consts.MANIFEST_FILE

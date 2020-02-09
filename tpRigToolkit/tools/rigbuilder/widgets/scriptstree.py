@@ -11,6 +11,8 @@ import os
 import logging
 
 from Qt.QtCore import *
+from Qt.QtWidgets import *
+from Qt.QtGui import *
 
 import tpDccLib as tp
 from tpDccLib.core import scripts

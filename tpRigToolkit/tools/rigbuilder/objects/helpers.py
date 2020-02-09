@@ -39,7 +39,7 @@ def is_object(directory):
     return True
 
 
-def get_object(directory, object_class=BuildObject):
+def get_object(directory, object_class=None):
     """
     Returns object if the given directory is a valid one
     :param directory: str
@@ -49,6 +49,10 @@ def get_object(directory, object_class=BuildObject):
 
     if not is_object(directory):
         return
+
+    if not object_class:
+        from tpRigToolkit.tools.rigbuilder.objects import build
+        object_class = build.BuildObject
 
     new_object = object_class(os.path.basename(directory))
     new_object.set_directory(os.path.dirname(directory))

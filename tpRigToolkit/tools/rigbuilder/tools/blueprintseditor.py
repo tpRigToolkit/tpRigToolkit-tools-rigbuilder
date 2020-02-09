@@ -19,7 +19,8 @@ from tpQtLib.core import base, tool
 from tpQtLib.widgets import stack, options
 
 from tpRigToolkit.core import resource
-from tpRigToolkit.tools.rigbuilder.core import consts, objects, utils
+from tpRigToolkit.tools.rigbuilder.core import consts, utils
+from tpRigToolkit.tools.rigbuilder.objects import blueprint
 from tpRigToolkit.tools.rigbuilder.widgets import scriptstree
 
 
@@ -218,14 +219,14 @@ class BlueprintsTree(QTreeWidget, object):
 
         blueprints_found = list()
         for path_to_find in paths_to_find:
-            blueprints_path = path_utils.clean_path(os.path.join(path_to_find, objects.Blueprint.BLUEPRINTS_FOLDER))
+            blueprints_path = path_utils.clean_path(os.path.join(path_to_find, blueprint.Blueprint.BLUEPRINTS_FOLDER))
             if not os.path.isdir(blueprints_path):
                 continue
             for blueprint_folder in os.listdir(blueprints_path):
                 blueprint_path = path_utils.clean_path(os.path.join(blueprints_path, blueprint_folder))
                 for root, _, filenames in os.walk(blueprint_path):
                     data_file_name = '{}.{}'.format(
-                        objects.Blueprint.DATA_FILE_NAME, objects.Blueprint.DATA_FILE_NAME_EXTENSION)
+                        blueprint.Blueprint.DATA_FILE_NAME, blueprint.Blueprint.DATA_FILE_NAME_EXTENSION)
                     if data_file_name in filenames:
                         for filename in filenames:
                             if filename.startswith(data_file_name):
@@ -239,7 +240,7 @@ class BlueprintsTree(QTreeWidget, object):
                                         continue
                                     if data_type == consts.DataTypes.Blueprint:
                                         blueprint_name = os.path.basename(os.path.dirname(data_file_path))
-                                        new_blueprint = objects.Blueprint(blueprint_name)
+                                        new_blueprint = blueprint.Blueprint(blueprint_name)
                                         new_blueprint.set_directory(path_to_find)
                                         blueprints_found.append(new_blueprint)
                                 except Exception as exc:
@@ -267,7 +268,7 @@ class BlueprintsTree(QTreeWidget, object):
         if not blueprint_name:
             return
 
-        new_blueprint = objects.Blueprint(blueprint_name)
+        new_blueprint = blueprint.Blueprint(blueprint_name)
         new_blueprint.set_directory(root_path)
         blueprint_path = new_blueprint.create()
         if not blueprint_path or not os.path.isdir(blueprint_path):

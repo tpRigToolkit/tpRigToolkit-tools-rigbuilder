@@ -19,11 +19,12 @@ from tpDccLib.core import scripts
 from tpPyUtils import jsonio, folder, path as path_utils
 
 from tpRigToolkit.tools.rigbuilder.core import consts
+from tpRigToolkit.tools.rigbuilder.objects import script
 
 LOGGER = logging.getLogger('tpRigToolkit')
 
 
-class Blueprint(ScriptObject, object):
+class Blueprint(script.ScriptObject, object):
 
     BLUEPRINTS_FOLDER = consts.BLUEPRINTS_FOLDER
     DATA_FILE_NAME_EXTENSION = 'json'
