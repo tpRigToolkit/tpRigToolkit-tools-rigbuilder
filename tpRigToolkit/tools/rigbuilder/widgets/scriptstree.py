@@ -11,9 +11,11 @@ import logging
 
 from Qt.QtCore import *
 
+from tpDccLib.core import scripts
 from tpPyUtils import fileio, path as path_utils
 
 from tpRigToolkit.core import resource
+from tpRigToolkit.tools.rigbuilder.core import utils
 from tpRigToolkit.tools.rigbuilder.widgets import buildtree
 
 LOGGER = logging.getLogger('tpRigToolkit')
@@ -23,6 +25,9 @@ class ScriptItemSignals(QObject, object):
 
     createPythonCode = Signal()
     createData = Signal()
+    renameCode = Signal()
+    duplicateCode = Signal()
+    deleteCode = Signal()
 
 
 class ScriptItem(buildtree.BuildItem, object):
@@ -78,11 +83,23 @@ class ScriptItem(buildtree.BuildItem, object):
 
         python_icon = resource.ResourceManager().icon('python')
         import_icon = resource.ResourceManager().icon('import')
+        play_icon = resource.ResourceManager().icon('play')
+        rename_icon = resource.ResourceManager().icon('rename')
+        duplicate_icon = resource.ResourceManager().icon('clone')
+        delete_icon = resource.ResourceManager().icon('delete')
 
         new_python_action = self._context_menu.addAction(python_icon, 'New Python Code')
         new_data_import_action = self._context_menu.addAction(import_icon, 'New Data Import')
+        self._context_menu.addSeparator()
+        run_action = self._context_menu.addAction(play_icon, 'Run')
+        rename_action = self._context_menu.addAction(rename_icon, 'Rename')
+        duplicate_action = self._context_menu.addAction(duplicate_icon, 'Duplicate')
+        delete_action = self._context_menu.addAction(delete_icon, 'Delete')
 
         new_python_action.triggered.connect(self.scriptSignals.createPythonCode.emit)
+        rename_action.triggered.connect(self.scriptSignals.renameCode.emit)
+        duplicate_action.triggered.connect(self.scriptSignals.duplicateCode.emit)
+        delete_action.triggered.connect(self.scriptSignals.deleteCode.emit)
 
 
 class ScriptTree(buildtree.BuildTree, object):
@@ -287,6 +304,9 @@ class ScriptTree(buildtree.BuildTree, object):
 
         if not self.itemSignalsConnected:
             item.scriptSignals.createPythonCode.connect(self._on_create_python_code)
+            item.scriptSignals.renameCode.connect(self._on_rename_current_item)
+            item.scriptSignals.duplicateCode.connect(self._on_duplicate_current_item)
+            item.scriptSignals.deleteCode.connect(self._on_delete_current_item)
 
         # Used to avoid script manifest update when check states of ScriptManifestItem is changed programatically
         if hasattr(item, 'handle_manifest'):
@@ -444,6 +464,36 @@ class ScriptTree(buildtree.BuildTree, object):
 
         return new_name
 
+    def _activate_rename(self):
+        """
+        Function that allows the user to type a new name script name
+        """
+
+        # current_library = self.library()
+        # if not current_library:
+        #     LOGGER.warning('Impossible to rename current item because data library is not defined!')
+        #     return
+
+        items = self.selectedItems()
+        if not items:
+            return
+        item = items[0]
+
+        self._old_name = str(item.get_text())
+        new_name = utils.show_rename_dialog('Rename item', 'Rename the current item to:', self._old_name)
+        if new_name == self._old_name:
+            return True
+        if not new_name:
+            return
+
+        if new_name == 'manifest' or new_name == 'manifest.py':
+            qtutils.warning_message('Manifest name is reserved. Name your script something else', parent=self)
+            return
+
+        self._rename_item(item, new_name)
+
+        return True
+
     # ================================================================================================
     # ======================== CALLBACKS
     # ================================================================================================
@@ -520,3 +570,88 @@ class ScriptTree(buildtree.BuildTree, object):
         # self.scrollToItem(item)
         # self.setItemSelected(item, True)
         # self.setCurrentItem(item)
+
+    def _on_rename_current_item(self):
+        """
+        Internal callback function that is triggered when the Rename action is clicked
+        :return:
+        """
+
+        self._activate_rename()
+
+    def _on_duplicate_current_item(self):
+        """
+        Internal callback function that is triggered when the Duplicate Item action is clicked
+        """
+
+        current_object = self.object()
+        if not current_object:
+            LOGGER.warning('Impossible to duplicate script because object is not defined!')
+            return
+
+        self.setFocus(Qt.ActiveWindowFocusReason)
+        items = self.selectedItems()
+        item = items[0]
+        script_name = self._get_item_path_name(item)
+        code_file = current_object.get_code_file(script_name)
+        parent_item = item.parent()
+        code_path = current_object.create_code(script_name, scripts.ScriptTypes.Python, unique_name=True)
+        file_lines = fileio.get_file_lines(code_file)
+        fileio.write_lines(code_path, file_lines, append=True)
+        path_name = path_utils.get_basename(code_path)
+        item = self._add_item(path_name, False)
+        item.setCheckState(0, Qt.Checked)
+        self._reparent_item(path_name, item, parent_item)
+        self.itemDuplicated.emit()
+        valid_rename = self._activate_rename()
+        if not valid_rename:
+            self._on_delete_current_item(force=True)
+        self.scrollToItem(item)
+        self.setItemSelected(item, True)
+        self.setCurrentItem(item)
+
+        return item
+
+    def _on_delete_current_item(self, force=False):
+        """
+        Internal callback funtion that is triggerd when delete item action is clicked
+        """
+
+        current_object = self.object()
+        if not current_object:
+            LOGGER.warning('Impossible to delete script/s because object is not defined!')
+            return
+
+        items = self.selectedItems()
+        delete_state = False if not force else True
+        if len(items) > 1 and not force:
+            delete_state = utils.show_question_dialog(
+                'Deleting scripts', 'Are you sure you want to delete selected scripts?')
+            if not delete_state or delete_state in (QMessageBox.No, QMessageBox.Cancel):
+                return
+
+        items_paths = list()
+        for item in items:
+            script_name = self._get_item_path_name(item)
+            if len(items) == 1 and not force:
+                delete_state = utils.show_question_dialog('Deleting {} script?'.format(script_name),
+                    'Are you sure you want to delete {} script?'.format(script_name))
+                if not delete_state or delete_state in (QMessageBox.No, QMessageBox.Cancel):
+                    return
+
+            script_path = current_object.get_code_file(script_name)
+            items_paths.append(script_path)
+            if delete_state:
+                index = self.indexFromItem(item)
+                parent = item.parent()
+                if parent:
+                    parent.removeChild(item)
+                else:
+                    self.takeTopLevelItem(index.row())
+
+                current_object.delete_code(script_name)
+                self.update_scripts_manifest()
+            else:
+                return
+
+        self.itemRemoved.emit(items_paths)

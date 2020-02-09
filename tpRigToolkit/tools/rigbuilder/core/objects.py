@@ -18,7 +18,7 @@ import logging
 import traceback
 
 from tpDccLib.core import scripts
-from tpPyUtils import jsonio, folder, fileio, settings, version, path as path_utils
+from tpPyUtils import jsonio, folder, fileio, settings, version, path as path_utils, name as name_utils
 
 from tpRigToolkit.tools import rigbuilder
 from tpRigToolkit.tools.rigbuilder.core import consts, data
@@ -1173,11 +1173,11 @@ class ScriptObject(BuildObject, object):
         new_len = new_name.count('/')
 
         if old_len != new_len:
-            tpRigBuilder.logger.warning('Rename works on code folder in the same folder. Try to move instead!')
+            LOGGER.warning('Rename works on code folder in the same folder. Try to move instead!')
             return
 
         sub_new_name = path_utils.remove_common_path(old_name, new_name)
-        code_folder = data.DataFolder(old_name, self.get_code_path())
+        code_folder = data.ScriptFolder(old_name, self.get_code_path())
         code_folder.rename(sub_new_name)
 
         code_name = new_name + '.py'
