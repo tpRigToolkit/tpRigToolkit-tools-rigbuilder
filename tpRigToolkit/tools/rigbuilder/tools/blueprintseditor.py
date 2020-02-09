@@ -9,15 +9,17 @@ from __future__ import print_function, division, absolute_import
 
 import os
 import logging
+from functools import partial
 
 from Qt.QtCore import *
 from Qt.QtWidgets import *
 
 from tpPyUtils import yamlio, path as path_utils
 from tpQtLib.core import base, tool
-from tpQtLib.widgets import stack, options, treewidgets
+from tpQtLib.widgets import stack, options
 
-from tpRigToolkit.tools.rigbuilder.core import consts, blueprint
+from tpRigToolkit.core import resource
+from tpRigToolkit.tools.rigbuilder.core import consts, objects, utils
 from tpRigToolkit.tools.rigbuilder.widgets import scriptstree
 
 
@@ -70,110 +72,19 @@ class BlueprintsEditor(tool.DockTool, object):
         self._content_layout.addWidget(self._stack)
 
         self._blueprints_viewer = BlueprintsViewer(project, settings, self.get_blueprints_path())
-        self._blueprints_creator = BlueprintsCreator(project, self.get_blueprints_path())
 
         self._stack.addWidget(self._blueprints_viewer)
-        self._stack.addWidget(self._blueprints_creator)
 
-        self._create_blueprint_btn = QPushButton('Create')
-        self._content_layout.addWidget(self._create_blueprint_btn)
-
-        self._create_blueprint_btn.clicked.connect(self._on_create_blueprint)
-        self._blueprints_creator.blueprintCreated.connect(self._on_blueprint_created)
-
-    def _on_create_blueprint(self):
-        self._stack.slide_in_index(1)
-        self._create_blueprint_btn.setVisible(False)
+        self._blueprints_viewer.blueprintCreated.connect(self._on_blueprint_created)
 
     def _on_blueprint_created(self):
-        self._stack.slide_in_index(0)
-        self._create_blueprint_btn.setVisible(True)
         self._blueprints_viewer.refresh()
 
 
-class BlueprintsCreator(base.BaseWidget, object):
+class BlueprintsViewer(base.BaseWidget, object):
 
     blueprintCreated = Signal(str)
 
-    def __init__(self, project, blueprints_path, parent=None):
-
-        self._project = project
-        self._blueprints_path = blueprints_path
-
-        super(BlueprintsCreator, self).__init__(parent=parent)
-
-    def ui(self):
-        super(BlueprintsCreator, self).ui()
-
-        grid_layout = QGridLayout()
-        self.main_layout.addLayout(grid_layout)
-
-        name_lbl = QLabel('Name:')
-        self._name_line = QLineEdit()
-        self._name_line.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-
-        path_lbl = QLabel('Path')
-        self._path_combo = QComboBox()
-        self._path_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self._path_line = QLineEdit()
-        self._path_line.setReadOnly(True)
-
-        grid_layout.addWidget(name_lbl, 0, 0, Qt.AlignRight)
-        grid_layout.addWidget(self._name_line, 0, 1)
-        grid_layout.addWidget(path_lbl, 1, 0, Qt.AlignRight)
-        grid_layout.addWidget(self._path_combo, 1, 1)
-        grid_layout.addWidget(self._path_line, 2, 0, 1, 2)
-
-        self._fill_path_combo()
-
-        self._create_btn = QPushButton('Create')
-        self.main_layout.addItem(QSpacerItem(0, 10, QSizePolicy.Preferred, QSizePolicy.Expanding))
-        self.main_layout.addWidget(self._create_btn)
-
-    def setup_signals(self):
-        self._create_btn.clicked.connect(self._on_create)
-        self._path_combo.currentIndexChanged.connect(self._on_path_index_changed)
-
-    def _fill_path_combo(self):
-        """
-        Internal function that fills combo
-        """
-
-        self._path_combo.clear()
-        self._path_combo.addItem('RigBuilder', userData=self._blueprints_path)
-        self._path_combo.addItem('Project: {}'.format(self._project.get_name()), userData=self._project.get_full_path())
-        self._path_line.setText(self._path_combo.currentData())
-
-    def _create_blueprint(self, name, path):
-        new_blueprint = blueprint.Blueprint(name=name, directory=path)
-        blueprint_path = new_blueprint.create()
-
-        return blueprint_path
-
-    def _on_path_index_changed(self, index):
-        self._path_line.setText(self._path_combo.currentData())
-
-    def _on_create(self):
-        blueprint_name = self._name_line.text().strip().replace(' ', '_')
-        blueprint_path = self._path_combo.currentData()
-        if not blueprint_name:
-            LOGGER.warning('Type a name for the blueprint!')
-            return
-        if not os.path.isdir(blueprint_path):
-            LOGGER.warning('Blueprint target path does not exists: "{}!"'.format(blueprint_path))
-            return
-
-        created_path = self._create_blueprint(blueprint_name, blueprint_path)
-        if not created_path or not os.path.isdir(created_path):
-            return
-
-        self.blueprintCreated.emit(created_path)
-
-        self._name_line.setText('')
-        self._path_combo.clear()
-
-
-class BlueprintsViewer(base.BaseWidget, object):
     def __init__(self, project, settings, blueprints_path, parent=None):
 
         self._project = project
@@ -196,13 +107,13 @@ class BlueprintsViewer(base.BaseWidget, object):
         main_splitter.addWidget(right_splitter)
 
         self._blueprints_scripts = BlueprintScripts(settings=self._settings)
-        self._blueprints_scripts_options = BlueprintScriptsOptions(project=self._project)
+        self._blueprints_scripts_options = BlueprintScriptsOptions()
         right_splitter.addWidget(self._blueprints_scripts)
-        right_splitter.addWidget(self._blueprints_scripts_options)
         right_splitter.addWidget(self._blueprints_scripts_options)
 
     def setup_signals(self):
         self._blueprints_tree.currentItemChanged.connect(self._on_blueprint_selected)
+        self._blueprints_tree.blueprintCreated.connect(self.blueprintCreated.emit)
 
     def refresh(self):
         """
@@ -221,6 +132,8 @@ class BlueprintsViewer(base.BaseWidget, object):
         if not hasattr(current, 'item_type') or not current.item_type == consts.DataTypes.Blueprint:
             self._blueprints_scripts.set_object(None)
             self._blueprints_scripts.set_directory('')
+            self._blueprints_scripts_options.set_option_object(None)
+            self._blueprints_scripts_options.clear_options()
             return
 
         blueprint_selected = current.data(0, Qt.UserRole)
@@ -229,9 +142,14 @@ class BlueprintsViewer(base.BaseWidget, object):
 
         self._blueprints_scripts.set_object(blueprint_selected)
         self._blueprints_scripts.set_directory(blueprint_selected.get_path())
+        self._blueprints_scripts_options.set_option_object(blueprint_selected)
+        self._blueprints_scripts_options.update_options()
 
 
 class BlueprintsTree(QTreeWidget, object):
+
+    blueprintCreated = Signal(str)
+
     def __init__(self, project, blueprints_path, parent=None):
         super(BlueprintsTree, self).__init__(parent)
 
@@ -239,8 +157,11 @@ class BlueprintsTree(QTreeWidget, object):
         self._blueprints_path = blueprints_path
 
         self.setAlternatingRowColors(True)
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
 
         self.refresh()
+
+        self.customContextMenuRequested.connect(self._on_custom_context_menu)
 
     def refresh(self):
         self.clear()
@@ -253,7 +174,7 @@ class BlueprintsTree(QTreeWidget, object):
         builder_item.item_type = 'root'
         project_item = QTreeWidgetItem()
         project_item.setText(0, 'Project: {}'.format(self._project.get_name()))
-        builder_item.setData(0, Qt.UserRole, project_path)
+        project_item.setData(0, Qt.UserRole, project_path)
         project_item.item_type = 'root'
 
         self.addTopLevelItem(builder_item)
@@ -297,25 +218,62 @@ class BlueprintsTree(QTreeWidget, object):
 
         blueprints_found = list()
         for path_to_find in paths_to_find:
-            for root, _, filenames in os.walk(path_to_find):
-                if blueprint.Blueprint.BLUEPRINT_DATA_FILE_NAME in filenames:
-                    for filename in filenames:
-                        if filename.startswith(blueprint.Blueprint.BLUEPRINT_DATA_FILE_NAME):
-                            data_file_path = path_utils.clean_path(os.path.join(root, filename))
-                            try:
-                                data_dict = yamlio.read_file(data_file_path)
-                                if not data_dict:
+            blueprints_path = path_utils.clean_path(os.path.join(path_to_find, objects.Blueprint.BLUEPRINTS_FOLDER))
+            if not os.path.isdir(blueprints_path):
+                continue
+            for blueprint_folder in os.listdir(blueprints_path):
+                blueprint_path = path_utils.clean_path(os.path.join(blueprints_path, blueprint_folder))
+                for root, _, filenames in os.walk(blueprint_path):
+                    data_file_name = '{}.{}'.format(
+                        objects.Blueprint.DATA_FILE_NAME, objects.Blueprint.DATA_FILE_NAME_EXTENSION)
+                    if data_file_name in filenames:
+                        for filename in filenames:
+                            if filename.startswith(data_file_name):
+                                data_file_path = path_utils.clean_path(os.path.join(root, filename))
+                                try:
+                                    data_dict = yamlio.read_file(data_file_path)
+                                    if not data_dict:
+                                        continue
+                                    data_type = data_dict.get('data_type', None)
+                                    if not data_type:
+                                        continue
+                                    if data_type == consts.DataTypes.Blueprint:
+                                        blueprint_name = os.path.basename(os.path.dirname(data_file_path))
+                                        new_blueprint = objects.Blueprint(blueprint_name)
+                                        new_blueprint.set_directory(path_to_find)
+                                        blueprints_found.append(new_blueprint)
+                                except Exception as exc:
                                     continue
-                                data_type = data_dict.get('data_type', None)
-                                if not data_type:
-                                    continue
-                                if data_type == consts.DataTypes.Blueprint:
-                                    blueprint_name = os.path.basename(os.path.dirname(data_file_path))
-                                    blueprints_found.append(blueprint.Blueprint(blueprint_name, path_to_find))
-                            except Exception as exc:
-                                continue
 
         return blueprints_found
+
+    def _on_custom_context_menu(self, pos):
+        item = self.itemAt(pos)
+        if not item or not hasattr(item, 'item_type'):
+            return
+
+        context_menu = QMenu(self)
+
+        item_type = item.item_type
+        if item_type == 'root':
+            create_icon = resource.ResourceManager().icon('import')
+            create_blueprint_action = context_menu.addAction(create_icon, 'New Blueprint')
+            create_blueprint_action.triggered.connect(partial(self._on_create_blueprint, item.data(0, Qt.UserRole)))
+
+        context_menu.exec_(self.mapToGlobal(pos))
+
+    def _on_create_blueprint(self, root_path):
+        blueprint_name = utils.show_rename_dialog('Blueprint Name', 'Type name of new blueprint:', 'blueprint')
+        if not blueprint_name:
+            return
+
+        new_blueprint = objects.Blueprint(blueprint_name)
+        new_blueprint.set_directory(root_path)
+        blueprint_path = new_blueprint.create()
+        if not blueprint_path or not os.path.isdir(blueprint_path):
+            return
+
+        self.blueprintCreated.emit(blueprint_path)
 
 
 class BlueprintScriptItem(scriptstree.ScriptItem, object):
@@ -332,15 +290,6 @@ class BlueprintScripts(scriptstree.ScriptTree, object):
         super(BlueprintScripts, self).__init__(parent)
 
 
-class BlueprintScriptsOptions(base.BaseWidget, object):
-    def __init_(self, project, parent=None):
-
-        self._project = project
-
-        super(BlueprintScriptsOptions, self).__init__(parent)
-
-    def ui(self):
-        super(BlueprintScriptsOptions, self).ui()
-
-        self._options = options.OptionsWidget()
-        self.main_layout.addWidget(self._options)
+class BlueprintScriptsOptions(options.OptionsWidget, object):
+    def __init_(self, settings=None, parent=None):
+        super(BlueprintScriptsOptions, self).__init__(settings=settings, parent=parent)
