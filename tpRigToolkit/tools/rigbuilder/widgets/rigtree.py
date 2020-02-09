@@ -294,7 +294,6 @@ class RigOutlinerTree(basetree.BaseTree, object):
     rigDuplicated = Signal(object, object)
 
     def __init__(self, checkable=True, settings=None, parent=None):
-        self._library = None
         self._settings = settings
         self._console = None
         self._checkable = checkable
@@ -674,22 +673,6 @@ class RigOutlinerTree(basetree.BaseTree, object):
     # ================================================================================================
     # ======================== BASE
     # ================================================================================================
-
-    def library(self):
-        """
-        Returns data library linked to this widget
-        :return: Liibrary
-        """
-
-        return self._library
-
-    def set_library(self, library):
-        """
-        Sets data library linked to this widget
-        :param library: Library
-        """
-
-        self._library = library
 
     def set_directory(self, directory, refresh=True, sub_path=''):
         """

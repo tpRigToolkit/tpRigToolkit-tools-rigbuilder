@@ -7,6 +7,8 @@ Module that contains widget for build tree
 
 from __future__ import print_function, division, absolute_import
 
+from tpRigToolkit.core import resource
+
 from tpRigToolkit.tools.rigbuilder.widgets import basetree
 
 
@@ -28,5 +30,35 @@ class BuildTree(basetree.BaseTree, object):
     # ======================== OVERRIDES
     # ================================================================================================
 
-    def refresh(self):
+    def refresh(self, sync=False):
+        """
+        Overrides base treewidgets.FileTreeWidget refresh function
+        :param sync: bool
+        """
+
         print('refreshgin ...')
+
+    def _create_actions(self, context_menu):
+        """
+        Overrides base BuildTree _create_new_actions function
+        Internal function that creates actions for the creation of new items
+        :param context_menu: QMenu
+        :return: list(QAction)
+        """
+
+        refresh_icon = resource.ResourceManager().icon('refresh')
+
+        refresh_action = self._context_menu.addAction(refresh_icon, 'Refresh')
+
+        refresh_action.triggered.connect(self._on_refresh)
+
+    # ================================================================================================
+    # ======================== CALLBACKS
+    # ================================================================================================
+
+    def _on_refresh(self):
+        """
+        Internal callback function that is triggered when the user selects Refresh action
+        """
+
+        self.refresh(sync=True)

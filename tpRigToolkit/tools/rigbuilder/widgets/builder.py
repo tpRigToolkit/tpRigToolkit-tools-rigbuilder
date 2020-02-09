@@ -7,11 +7,7 @@ Module that contains builder widget for RigBuilder
 
 from __future__ import print_function, division, absolute_import
 
-from Qt.QtCore import *
-from Qt.QtWidgets import *
-
 from tpQtLib.core import base
-from tpQtLib.widgets import breadcrumb
 
 from tpRigToolkit.tools.rigbuilder.widgets import buildtree
 
@@ -20,7 +16,6 @@ class RigBuilder(base.DirectoryWidget, object):
     def __init__(self, project=None, settings=None, console=None, parent=None):
 
         self._library = None
-        self._object = None
         self._project = project
         self._settings = settings
         self._console = console
@@ -30,24 +25,11 @@ class RigBuilder(base.DirectoryWidget, object):
     def ui(self):
         super(RigBuilder, self).ui()
 
-        title_widget = QFrame()
-        title_widget.setObjectName('TaskFrame')
-        title_widget.setFrameStyle(QFrame.StyledPanel)
-        title_layout = QHBoxLayout()
-        title_layout.setContentsMargins(2, 2, 2, 2)
-        title_layout.setSpacing(2)
-        title_widget.setLayout(title_layout)
-        self._title = breadcrumb.BreadcrumbWidget()
-        self.reset_title()
-
-        title_layout.addItem(QSpacerItem(30, 0, QSizePolicy.Expanding, QSizePolicy.Fixed))
-        title_layout.addWidget(self._title)
-        title_layout.addItem(QSpacerItem(30, 0, QSizePolicy.Expanding, QSizePolicy.Fixed))
-
         self._builder_tree = buildtree.BuildTree(settings=self._settings)
 
-        self.main_layout.addWidget(title_widget)
         self.main_layout.addWidget(self._builder_tree)
+
+        self.disable()
 
     # ================================================================================================
     # ======================== BASE
@@ -87,6 +69,24 @@ class RigBuilder(base.DirectoryWidget, object):
             self._builder_tree.set_directory(self._project.full_path)
         else:
             self._builder_tree.set_directory(None)
+
+    def rig(self):
+        """
+        Returns rig object linked to rig builder tree
+        :return: RigObject
+        """
+
+        return self._builder_tree.object()
+
+    def set_rig(self, rig):
+        """
+        Sets the object linked to builder tree
+        :param rig: RigObject
+        """
+
+        self._builder_tree.set_object(rig)
+
+        self.enable() if rig else self.disable()
 
     def library(self):
         """
@@ -129,18 +129,9 @@ class RigBuilder(base.DirectoryWidget, object):
 
         return self._builder_tree
 
-    def set_title(self, name):
+    def refresh(self):
         """
-        Internal function used to update the title
-        :param name: str,
-        """
-
-        rig_names = name.split('/')
-        self._title.set(rig_names)
-
-    def reset_title(self):
-        """
-        Resets the current title
+        Refresh current item
         """
 
-        self._title.set(['No Rig Selected'])
+        self._builder_tree.refresh(True)

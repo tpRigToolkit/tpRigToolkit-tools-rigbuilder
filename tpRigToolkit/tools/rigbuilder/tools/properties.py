@@ -34,5 +34,11 @@ class PropertiesTool(tool.DockTool, object):
     def show_tool(self):
         super(PropertiesTool, self).show_tool()
 
+    def refresh(self):
+        pass
+
     def set_project(self, project):
+        pass
+
+    def set_object(self, object):
         pass

@@ -14,10 +14,13 @@ from Qt.QtWidgets import *
 
 import tpQtLib
 from tpQtLib.core import tool
+from tpQtLib.widgets import tabs, breadcrumb
+from tpPyUtils import osplatform, path as path_utils
 
-from tpRigToolkit.tools.rigbuilder.widgets import builder, rigoutliner
+from tpRigToolkit.tools.rigbuilder.widgets import builder, rigoutliner, blueprint
+from tpRigToolkit.tools.rigbuilder.objects import rig
 from tpRigToolkit.tools.rigbuilder.tools import datalibrary, controls, blueprintseditor, properties
-
+from tpRigToolkit.tools.rigbuilder.tools import buildnodeslibrary, blueprintslibrary
 
 LOGGER = logging.getLogger('tpRigToolkit')
 
@@ -31,10 +34,14 @@ class HubWidget(tpQtLib.Window, object):
         self._progress_bar = progress_bar
         self._tools_classes = list()
 
+        self._current_rig = None
+        self._path_filter = ''
+        self._handle_selection_change = True
+
         # TODO: Tool registration should be automatic
         for tool_class in [
             datalibrary.DataLibrary, controls.ControlsTool, properties.PropertiesTool,
-            blueprintseditor.BlueprintsEditor]:
+            blueprintseditor.BlueprintsEditor, buildnodeslibrary.BuldNodesLibrary, blueprintslibrary.BlueprintsLibrary]:
             self.register_tool_class(tool_class)
 
         super(HubWidget, self).__init__(
@@ -48,6 +55,10 @@ class HubWidget(tpQtLib.Window, object):
 
         self.statusBar().hide()
 
+    # ================================================================================================
+    # ======================== PROPERTIES
+    # ================================================================================================
+
     @property
     def tools_classes(self):
         """
@@ -57,22 +68,62 @@ class HubWidget(tpQtLib.Window, object):
 
         return self._tools_classes
 
+    # ================================================================================================
+    # ======================== OVERRIDES
+    # ================================================================================================
+
     def ui(self):
         super(HubWidget, self).ui()
 
         self.setAcceptDrops(True)
-
-        self._outliner = rigoutliner.RigOutliner(settings=self._settings, project=self._project, console=self._console)
-        self._builder = builder.RigBuilder(settings=self._settings, project=self._project, console=self._console)
 
         main_splitter = QSplitter(self)
         main_splitter.setOrientation(Qt.Horizontal)
         main_splitter.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.main_layout.addWidget(main_splitter)
 
+        self._main_tab = tabs.TearOffTabWidget()
+        self._main_tab.setTabsClosable(False)
+
+        self._blueprint = blueprint.BlueprintWidget()
+        self._outliner = rigoutliner.RigOutliner(settings=self._settings, project=self._project, console=self._console)
+        self._builder = builder.RigBuilder(settings=self._settings, project=self._project, console=self._console)
+
+        title_widget = QFrame()
+        title_widget.setObjectName('TaskFrame')
+        title_widget.setFrameStyle(QFrame.StyledPanel)
+        title_layout = QHBoxLayout()
+        title_layout.setContentsMargins(2, 2, 2, 2)
+        title_layout.setSpacing(2)
+        title_widget.setLayout(title_layout)
+        self._title = breadcrumb.BreadcrumbWidget()
+        self.reset_title()
+
+        title_layout.addItem(QSpacerItem(30, 0, QSizePolicy.Expanding, QSizePolicy.Fixed))
+        title_layout.addWidget(self._title)
+        title_layout.addItem(QSpacerItem(30, 0, QSizePolicy.Expanding, QSizePolicy.Fixed))
+
+        tab_widget = QWidget()
+        tab_layout = QVBoxLayout()
+        tab_layout.setContentsMargins(0, 0, 0, 0)
+        tab_layout.setSpacing(0)
+        tab_widget.setLayout(tab_layout)
+        tab_layout.addWidget(title_widget)
+        tab_layout.addWidget(self._main_tab)
+
         main_splitter.addWidget(self._outliner)
-        main_splitter.addWidget(self._builder)
+        main_splitter.addWidget(tab_widget)
+
+        self._main_tab.addTab(self._blueprint, 'Template')
+        self._main_tab.addTab(self._builder, 'Builder')
         main_splitter.setSizes([1, 1])
+
+    def setup_signals(self):
+        self._outliner.tree_widget.itemSelectionChanged.connect(self._on_outliner_item_selection_changed)
+
+    # ================================================================================================
+    # ======================== BASE
+    # ================================================================================================
 
     def get_project(self):
         """
@@ -166,8 +217,28 @@ class HubWidget(tpQtLib.Window, object):
         """
 
         self._library = library
-        # self._outliner.set_library(library)
-        # self._rig_pipeline.set_library(library)
+        self._outliner.set_library(library)
+        self._builder.set_library(library)
+
+    def set_title(self, name):
+        """
+        Internal function used to update the title
+        :param name: str,
+        """
+
+        rig_names = name.split('/')
+        self._title.set(rig_names)
+
+    def reset_title(self):
+        """
+        Resets title
+        """
+
+        self._title.set(['No Rig Selected'])
+
+    # ================================================================================================
+    # ======================== TOOLS
+    # ================================================================================================
 
     def register_tool_class(self, tool_class):
         """
@@ -208,3 +279,180 @@ class HubWidget(tpQtLib.Window, object):
         tool_instance.show_tool()
 
         return tool_instance
+
+    # ================================================================================================
+    # ======================== INTERNAL
+    # ================================================================================================
+
+    def _get_project_settings(self):
+        """
+        Returns JSON settings object used of the project
+        :return: JSONSettings
+        """
+
+        return self._project.settings
+
+    def _get_project_setting(self, name):
+        """
+        Returns a setting value stored in the project settings
+        :param name: str
+        :return: variant
+        """
+
+        project_settings = self._get_project_settings()
+        if not project_settings:
+            return
+
+        return project_settings.get(name)
+
+    def _set_project_setting(self, name, value):
+        """
+        Internal function used to set a setting of the project
+        :param name: str
+        :param value: variant
+        """
+
+        project_settings = self._get_project_settings()
+        if not project_settings:
+            return
+
+        project_settings.set(name, value)
+
+    def _get_filtered_project_path(self, filter_value=None):
+        """
+        Internal function used to set the filter path
+        :param filter_value: str
+        :return: str
+        """
+
+        if not filter_value:
+            filter_value = self._path_filter
+        if filter_value:
+            project_path = path_utils.join_path(self._project.full_path, filter_value)
+        else:
+            project_path = self._project.full_path
+
+        return project_path
+
+    def _get_current_rig_name(self):
+        """
+        Returns the current rig name
+        :return: str
+        """
+
+        if not self._current_rig:
+            return
+
+        return self._current_rig.get_name()
+
+    def _get_current_rig_path(self):
+        """
+        Returns the path where current rig is located
+        :return: str
+        """
+
+        if not self._project:
+            return
+
+        rig_name = self._get_current_rig_name()
+        if rig_name:
+            filter_str = self._outliner.filter_widget.get_sub_path_filter()
+            rig_directory = self._project.full_path
+            if filter_str:
+                rig_directory = path_utils.join_path(self._project.full_path, filter_str)
+
+            rig_directory = path_utils.join_path(rig_directory, rig_name)
+
+            return rig_directory
+        else:
+            filter_value = self._outliner.filter_widget.get_sub_path_filter()
+            if filter_value:
+                rig_directory = path_utils.join_path(self._project.full_path, filter_value)
+            else:
+                rig_directory = self._project.full_path
+
+            return rig_directory
+
+    def _set_current_rig(self, rig_name):
+        """
+        Internal function that sets the current active rig
+        :param rig_name: str
+        """
+
+        if not rig_name or not self._project:
+            self._current_rig = None
+            return
+
+        self._set_project_setting('rig', rig_name)
+        self._current_rig = rig.RigObject(name=rig_name)
+        self._current_rig.set_directory(self._project.full_path)
+        self._current_rig.set_library(self.library())
+
+        full_path = self._get_current_rig_path()
+        LOGGER.debug('New Selected Rig Path: {}'.format(full_path))
+        if not osplatform.get_permission(full_path):
+            LOGGER.warning('Could not get permission for rig: {}'.format(rig_name))
+
+    def _update_rig(self, rig_name):
+        """
+        Internal function that updates the current active rig
+        :param rig_name: str
+        """
+
+        self._set_current_rig(rig_name)
+
+        rigs = self._outliner.tree_widget.selectedItems()
+        if rigs and self._current_rig:
+            title = self._current_rig.get_name()
+
+        if rig_name:
+            project_path = self._get_filtered_project_path()
+            self._current_rig.load(project_path)
+            self.set_title(title)
+        else:
+            self.reset_title()
+
+    def _refresh_selected_item(self):
+        """
+        Internal callback function that refresh current rig item selected in rig outliner
+        """
+
+        if not self._handle_selection_change:
+            return
+
+        data_library = self.data_library()
+        properties_widget = self.properties_widget()
+
+        rigs = self._outliner.tree_widget.selectedItems()
+        if not rigs:
+            self._update_rig(None)
+            data_library.set_path(None)
+            self._builder.set_rig(None)
+            properties_widget.set_object(None)
+            self._builder.refresh()
+            return
+
+        item = rigs[0]
+        if item.matches(self._current_rig):
+            return
+
+        rig_name = item.get_name()
+        self._update_rig(rig_name)
+        self._outliner.setFocus()
+        data_library.set_path(self._current_rig.get_path())
+        self._builder.set_rig(self._current_rig)
+        properties_widget.set_object(self._current_rig)
+
+        self._builder.refresh()
+        properties_widget.refresh()
+
+    # ================================================================================================
+    # ======================== CALLBACKS
+    # ================================================================================================
+
+    def _on_outliner_item_selection_changed(self):
+        """
+        Internal callback function that is called when a rig is selected in the rig outliner
+        """
+
+        self._refresh_selected_item()

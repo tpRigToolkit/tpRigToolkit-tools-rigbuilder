@@ -363,6 +363,7 @@ class BaseTree(treewidgets.FileTreeWidget, object):
         super(BaseTree, self).__init__(parent=parent)
 
         self._object = None
+        self._library = None
         self._settings = settings
 
         self._handle_selection_change = True
@@ -566,6 +567,22 @@ class BaseTree(treewidgets.FileTreeWidget, object):
         """
 
         self._object = script_object
+
+    def library(self):
+        """
+        Returns data library linked to this widget
+        :return: Liibrary
+        """
+
+        return self._library
+
+    def set_library(self, library):
+        """
+        Sets data library linked to this widget
+        :param library: Library
+        """
+
+        self._library = library
 
     def break_index(self):
         """
@@ -779,7 +796,7 @@ class BaseTree(treewidgets.FileTreeWidget, object):
 
     def _create_actions(self, context_menu):
         """
-        Internal function that creates actions for the creation
+        Internal function that creates actions
         :param context_menu: QMenu
         """
 
