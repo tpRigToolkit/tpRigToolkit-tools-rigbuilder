@@ -37,6 +37,8 @@ class ScriptObject(build.BuildObject, object):
 
     CODE_FOLDER = consts.CODE_FOLDER
     MANIFEST_FILE = consts.MANIFEST_FILE
+    MANIFEST_FOLDER = consts.MANIFEST_FOLDER
+    DESCRIPTION = 'script'
 
     def __init__(self, name):
         super(ScriptObject, self).__init__(name=name)
@@ -392,7 +394,7 @@ class ScriptObject(build.BuildObject, object):
                 if path_utils.is_dir(external_code_path):
                     if not external_code_path in sys.path:
                         sys.path.append(external_code_path)
-            builtins = helpers.get_code_builtins(self)
+            builtins = helpers.ScriptHelpers.get_code_builtins(self)
             exec(script, globals(), builtins)
             status = ScriptStatus.SUCCESS
         except Exception:
@@ -421,7 +423,7 @@ class ScriptObject(build.BuildObject, object):
         """
 
         code_path = self.get_code_path()
-        manifest_path = path_utils.join_path(code_path, self.MANIFEST_FILE)
+        manifest_path = path_utils.join_path(code_path, self.MANIFEST_FOLDER)
         if not path_utils.is_dir(manifest_path):
             try:
                 self.create_code(self.MANIFEST_FILE, consts.DataTypes.Manifest)
