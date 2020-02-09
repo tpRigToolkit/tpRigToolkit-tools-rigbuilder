@@ -671,39 +671,37 @@ class ScriptTree(buildtree.BuildTree, object):
         Internal callback function that is triggered when New Import Data action is selected
         """
 
-        print('creating data ...')
+        current_object = self.object()
+        if not current_object:
+            tpRigBuilder.logger.warning('Impossible to create new data import code because object is not defined!')
+            return
 
-        # from tpRigTask.widgets import data
-        #
-        # current_rig = self.rig()
-        # if not current_rig:
-        #     tpRigBuilder.logger.warning('Impossible to create new data import code because rig is not defined!')
-        #     return
-        #
-        # parent_item = None
-        # items = self.selectedItems()
-        # if items:
-        #     parent_item = items[0]
-        #
-        # if not data_name:
-        #     raise NotImplementedError('Creating data from scratch is not supported yet!')
-        #     # data_picker = data.PickerDataWidget()
-        #     # data_picker.exec_()
-        #     # data_picked = data_picker.selected_data
-        #     # if not data_picked:
-        #     #     rigtask.logger.warning('Selected Data {} is not valid!'.format(data_picked))
-        #     #     return
-        #     # data_name = data_picked.file_name_line.text()
-        #
-        # import_data = data_name if data_extension is None else '{}{}'.format(data_name, data_extension)
-        # code_path = current_rig.create_code(name='import_{}'.format(data_name), data_type=scripts.ScriptTypes.Python, unique_name=True, import_data=import_data)
-        # basename = path.get_basename(code_path)
-        # item = self._add_item(basename, False)
-        # item.setCheckState(0, Qt.Checked)
-        # self._reparent_item('import_{}'.format(data_name), item, parent_item)
-        # self.scrollToItem(item)
-        # self.setItemSelected(item, True)
-        # self.setCurrentItem(item)
+        parent_item = None
+        items = self.selectedItems()
+        if items:
+            parent_item = items[0]
+
+        if not data_name:
+            raise NotImplementedError('Creating data from scratch is not supported yet!')
+            # data_picker = data.PickerDataWidget()
+            # data_picker.exec_()
+            # data_picked = data_picker.selected_data
+            # if not data_picked:
+            #     rigtask.logger.warning('Selected Data {} is not valid!'.format(data_picked))
+            #     return
+            # data_name = data_picked.file_name_line.text()
+
+        import_data = data_name if data_extension is None else '{}{}'.format(data_name, data_extension)
+        code_path = current_object.create_code(
+            name='import_{}'.format(data_name), data_type=scripts.ScriptTypes.Python,
+            unique_name=True, import_data=import_data)
+        basename = path_utils.get_basename(code_path)
+        item = self._add_item(basename, False)
+        item.setCheckState(0, Qt.Checked)
+        self._reparent_item('import_{}'.format(data_name), item, parent_item)
+        self.scrollToItem(item)
+        self.setItemSelected(item, True)
+        self.setCurrentItem(item)
 
     def _on_run_current_item(self, external_code_library=None):
         """
@@ -757,7 +755,7 @@ class ScriptTree(buildtree.BuildTree, object):
                     script_name = item.text(0)
                     script_path = self.get_item_path(item)
                     if script_path:
-                        script_name = path.join_path(script_path, script_name)
+                        script_name = path_utils.join_path(script_path, script_name)
                     if script_name == scripts[i]:
                         self._run_item(item, current_object)
                         if not item.isExpanded():

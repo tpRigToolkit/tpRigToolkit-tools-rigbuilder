@@ -16,14 +16,21 @@ import string
 import logging
 import traceback
 
+import tpDccLib as tp
 from tpDccLib.core import scripts
-from tpPyUtils import folder, fileio, version, path as path_utils, name as name_utils
+from tpPyUtils import log, python, folder, fileio, timers, version, path as path_utils, name as name_utils
 
 from tpRigToolkit.tools import rigbuilder
 from tpRigToolkit.tools.rigbuilder.core import consts, data
-from tpRigToolkit.tools.rigbuilder.objects import build
+from tpRigToolkit.tools.rigbuilder.objects import helpers, build
 
 LOGGER = logging.getLogger('tpRigToolkit')
+
+
+class ScriptStatus(object):
+    FAIL = 'fail'
+    SKIPPED = 'Skipped'
+    SUCCESS = 'Success'
 
 
 class ScriptObject(build.BuildObject, object):
@@ -54,6 +61,14 @@ class ScriptObject(build.BuildObject, object):
                 return False
 
         return True
+
+    def _refresh(self):
+        """
+        Internal function that is called when object is loaded
+        """
+
+        super(ScriptObject, self)._refresh()
+        self._runtime_values = dict()
 
     def _create_folder(self):
         """
@@ -87,6 +102,313 @@ class ScriptObject(build.BuildObject, object):
 
         external_directory = python.force_list(external_directory)
         self._external_code_paths = external_directory
+
+    # ================================================================================================
+    # ======================== CREATE / LOAD
+    # ================================================================================================
+
+    def get_runtime_value(self, name):
+        """
+        Returns the value stored with set_runtime_value
+        :param name: str, name given to the runtime value
+        :return: variant
+        """
+
+        if name in self._runtime_values:
+            value = self._runtime_values[name]
+            LOGGER.debug('Accessed - Runtime Variable: {}, value: {}'.format(name, value))
+            return value
+
+    def get_runtime_value_keys(self):
+        """
+        Returns the runtime value dictionary keys
+        :return: list<str>, ist of keys in runtime values dictionary
+        """
+
+        return self._runtime_values.keys()
+
+    def set_runtime_value(self, name, value):
+        """
+        Stores data to run between scripts
+        :param name: str, name of runtime value
+        :param value: variant, list, tuple, float, int, etc, value of the script
+        """
+
+        LOGGER.debug('Created Runtime Variable: {}, value: {}'.format(name, value))
+        self._runtime_values[name] = value
+
+    def set_runtime_dict(self, dict_value):
+        """
+        Sets the runtime values dictionary
+        :param dict_value: dict
+        """
+
+        self._runtime_values = dict_value
+
+    def get_runtime_values(self):
+        """
+        Returns rig runtime values
+        :return: list
+        """
+
+        return self._runtime_values
+
+    def run_script(self, script, hard_error=True, settings=None):
+        """
+        Runs a script in the rig
+        :param script: str, name of the script in the rig we want to execute
+        :param hard_error: bool, Whether to raise error when an error is encountered
+        in the script or to just pass an error string
+        :param settings:
+        :return: str, status from running the script (including error messages)
+        """
+
+        tp.Dcc.clear_selection()
+        tp.Dcc.refresh_viewport()
+
+        basename = ''
+        module = None
+        orig_script = script
+
+        log.start_temp_log(LOGGER.name)
+
+        self._reset_builtin()
+        tp.Dcc.enable_undo()
+
+        try:
+            if not path_utils.is_file(script):
+                script = fileio.remove_extension(script)
+                script = self.get_code_file(script)
+            if not path_utils.is_file(script):
+                self._reset_builtin()
+                LOGGER.warning('Could not find script: {}'.format(orig_script))
+                return
+            auto_focus = False
+            if settings:
+                if settings.has_setting('auto_focus_scene'):
+                    auto_focus = settings.get('auto_focus_scene')
+
+            if auto_focus:
+                self._prepare()
+
+            basename = path_utils.get_basename(script)
+            for external_code_path in self._external_code_paths:
+                if path_utils.is_dir(external_code_path):
+                    if external_code_path not in sys.path:
+                        sys.path.append(external_code_path)
+
+            LOGGER.info('\n------------------------------------------------')
+            LOGGER.debug('START\t{}\n\n'.format(basename))
+
+            module, init_passed, status = self._source_script(script)
+        except Exception:
+            LOGGER.warning('{} did not source!'.format(script))
+            status = traceback.format_exc()
+            init_passed = False
+            if hard_error:
+                tp.Dcc.disable_undo()
+                self._reset_builtin()
+                try:
+                    del module
+                except Exception:
+                    LOGGER.warning('Could not delete module: {}!'.format(module))
+                LOGGER.error('{}\n'.format(status))
+                raise
+
+        if init_passed:
+            try:
+                if hasattr(module, 'main'):
+                    module.main()
+                    status = ScriptStatus.SUCCESS
+            except Exception:
+                status = traceback.format_exc()
+                self._reset_builtin()
+                if hard_error:
+                    tp.Dcc.disable_undo()
+                    LOGGER.error('{}\n'.format(status))
+                    raise
+
+        tp.Dcc.disable_undo()
+
+        del module
+        self._reset_builtin()
+
+        if not status == ScriptStatus.SUCCESS:
+            LOGGER.debug('{}\n'.format(status))
+
+        LOGGER.info('\nEND\t{}\n\n'.format(basename))
+        log.end_temp_log(LOGGER.name)
+
+        return status
+
+    def run(self, start_new=False):
+        """
+        Run all the scripts in the script manifest (taking into account their on/off state)
+        """
+
+        prev_task = osplatform.get_env_var('RIGBUILDER_CURRENT_SCRIPT')
+        osplatform.set_env_var('RIGBUILDER_CURRENT_SCRIPT', self.get_path())
+        LOGGER.info('---------------------------------------------------------------')
+
+        watch = timers.StopWatch()
+        watch.start(feedback=False)
+
+        name = self.get_name()
+
+        msg = '\n\n\n\aRunning {} Scripts\t\a\n\n'.format(name)
+
+        manage_node_editor_inst = None
+        if tp.is_maya():
+            from tpMayaLib.core import gui
+            manage_node_editor_inst = gui.ManageNodeEditors()
+            if start_new:
+                tp.Dcc.new_file(force=True)
+            manage_node_editor_inst.turn_off_add_new_nodes()
+            if tp.Dcc.is_batch():
+                msg = '\n\n\nRunning {} Scripts\n\n'.format(name)
+
+        LOGGER.info(msg)
+        LOGGER.debug('\n\nScript Path: {}'.format(self.get_path()))
+        LOGGER.debug('Option Path: {}'.format(self.get_option_file()))
+        LOGGER.debug('Settings Path: {}'.format(self.get_settings_file()))
+        LOGGER.debug('Runtime Values: {}\n\n'.format(self._runtime_values))
+
+        scripts, states = self.get_scripts_manifest()
+
+        scripts_with_error = list()
+        state_dict = dict()
+        progress_bar = None
+
+        if tp.is_maya():
+            progress_bar = tp.Dcc.get_progress_bar_class()('Process', len(scripts))
+            progress_bar.status('Processing: getting ready ...')
+
+        status_list = list()
+        for i in range(len(scripts)):
+            state = states[i]
+            script = scripts[i]
+            status = ScriptStatus.SKIPPED
+            check_script = script[:-3]
+            state_dict[check_script] = state
+            if progress_bar:
+                progress_bar.status('Processing: {}'.format(script))
+                if progress_bar.break_signaled():
+                    if osplatform.get_env_var('RIGBUILDER_RUN') == 'True':
+                        osplatform.set_env_var('RIGBULIDER_STOP', True)
+                    break
+
+            if state:
+                parent_state = True
+                for key in state_dict:
+                    if script.find(key) > -1:
+                        parent_state = state_dict[key]
+                        if not parent_state:
+                            break
+
+                if not parent_state:
+                    LOGGER.warning('Skipping: {}\n\n'.format(script))
+                    if progress_bar:
+                        progress_bar.inc()
+                    continue
+
+                try:
+                    status = self.run_script(script, hard_error=False)
+                except:
+                    status = ScriptStatus.FAIL
+
+                if not status == ScriptStatus.SUCCESS:
+                    scripts_with_error.append(script)
+
+            if not states[i]:
+                LOGGER.warning('\n---------------------------------------------')
+                LOGGER.warning('Skipping: {}\n\n'.format(script))
+
+            if progress_bar:
+                progress_bar.inc()
+
+            status_list.append([script, status])
+
+        minutes, seconds = watch.stop()
+
+        if progress_bar:
+            progress_bar.end()
+
+        if scripts_with_error:
+            LOGGER.error('\n\n\nThe following scripts error during build:\n')
+            for script in scripts_with_error:
+                LOGGER.error('\n' + script)
+
+        if minutes is None:
+            LOGGER.info('\n\n\nProcess build in {} seconds.\n\n'.format(seconds))
+        else:
+            LOGGER.info('\n\n\nProcess build in {} minutes, {} seconds'.format(minutes, seconds))
+
+        LOGGER.debug('\n\n')
+        for status_entry in status_list:
+            LOGGER.debug('{} : {}'.format(status_entry[1], status_entry[0]))
+        LOGGER.logger.debug('\n\n')
+
+        osplatform.set_env_var('RIGBUILDER_CURRENT_SCRIPT', prev_task)
+
+        if manage_node_editor_inst:
+            manage_node_editor_inst.restore_add_new_nodes()
+
+        return status_list
+
+    def run_script_group(self, script, hard_error=True):
+        """
+        Runs the script and alls of its children/grandchildren
+        :param script: str
+        """
+
+        self.run_script(script=script, hard_error=hard_error)
+        children = self.get_code_children(script)
+        manifest_dict = self.get_scripts_manifest_dict()
+        for child in children:
+            if manifest_dict[child]:
+                self.run_script(child, hard_error=hard_error)
+
+    def run_option_script(self, name, group=None, hard_error=True):
+        """
+        Run given script option
+        :param name: str
+        :param group: str
+        :param hard_error: bool
+        """
+        script = self.get_option(name, group)
+        self.run_code_snippet(script, hard_error)
+
+    def run_code_snippet(self, code_snippet_string, hard_error=True):
+        """
+        Runs given code snippet
+        :param code_snippet_string: str
+        :param hard_error: bool
+        """
+
+        script = code_snippet_string
+        tp.Dcc.enable_undo()
+        try:
+            for external_code_path in self._external_code_paths:
+                if path_utils.is_dir(external_code_path):
+                    if not external_code_path in sys.path:
+                        sys.path.append(external_code_path)
+            builtins = helpers.get_code_builtins(self)
+            exec(script, globals(), builtins)
+            status = ScriptStatus.SUCCESS
+        except Exception:
+            LOGGER.warning('Script Error! : {}!'.format(script))
+            status = traceback.format_exc()
+            if hard_error:
+                tp.Dcc.disable_undo()
+            LOGGER.error('{}\n'.format(status))
+            raise
+
+        tp.Dcc.disable_undo()
+
+        if not status == ScriptStatus.SUCCESS:
+            LOGGER.info('{}\n'.format(status))
+
+        return status
 
     # ================================================================================================
     # ======================== MANIFEST
@@ -649,3 +971,60 @@ class ScriptObject(build.BuildObject, object):
         """
 
         folder.delete_folder(name, self.get_code_path())
+
+    # ================================================================================================
+    # ======================== INTERNAL
+    # ================================================================================================
+
+    def _reset_builtin(self):
+        """
+        Internal function used to reset current builtin variables
+        """
+
+        helpers.reset_code_bultins(self)
+
+    def _source_script(self, script):
+        """
+        Internal function that source the given script
+        :param script: str, script in task we want to source
+        :return:
+        """
+
+        python.delete_pyc_file(script)
+        self._reset_builtin()
+        helpers.setup_code_builtins(self)
+
+        LOGGER.info('Sourcing: {}'.format(script))
+
+        module = python.source_python_module(script)
+        status = None
+        init_passed = False
+
+        if module and type(module) != str:
+            init_passed = True
+        if not module or type(module) == str:
+            status = module
+            init_passed = False
+
+        return module, init_passed, status
+
+    def _prepare(self):
+        """
+        Internal function that is called before a task script is run
+        """
+
+        tp.Dcc.clear_selection()
+        self._center_view()
+
+    def _center_view(self):
+        """
+        Internal function that centers the current camera in the viewport
+        """
+
+        if tp.is_maya():
+            if not tp.Dcc.is_batch():
+                try:
+                    tp.Dcc.clear_selection()
+                    tp.Dcc.fit_view(animation=True)
+                except Exception:
+                    LOGGER.warning('Could not center view!')

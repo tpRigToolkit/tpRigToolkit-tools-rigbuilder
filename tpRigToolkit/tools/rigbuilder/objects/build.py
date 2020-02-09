@@ -270,9 +270,43 @@ class BuildObject(object):
 
         return [settings_name, option_name]
 
+    def rename(self, new_name):
+        """
+        Renames the object
+        :param new_name: str, new name for the object
+        :return: bool, Whether the object was renamed or not
+        """
+
+        split_name = new_name.split('/')
+        if path_utils.rename(self.get_path(), split_name[-1]):
+            self.load(new_name)
+            return True
+
+        return False
+
+    def delete(self):
+        """
+        Deletes the rig
+        """
+
+        if self._name:
+            folder.delete_folder(self._name, self._directory)
+        else:
+            basename = path_utils.get_basename(self._directory)
+            dir_name = path_utils.get_dirname(self._directory)
+            folder.delete_folder(basename, dir_name)
+
     # ================================================================================================
     # ======================== CREATE / LOAD
     # ================================================================================================
+
+    def load(self, rig_name):
+        """
+        Loads the given rig into the instance
+        :param rig_name: str
+        """
+
+        self._refresh()
 
     def create(self):
         """
@@ -630,6 +664,14 @@ class BuildObject(object):
 
         raise NotImplementedError(
             '_create_folder function for "{}" is not implemented!'.format(self.__class__.__name__))
+
+    def _refresh(self):
+        """
+        Internal function that is called when object is loaded
+        """
+
+        self._setup_options()
+        self._setup_settings()
 
     def _get_path(self, name):
         """

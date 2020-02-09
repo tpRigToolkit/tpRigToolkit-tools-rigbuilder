@@ -12,11 +12,14 @@ import os
 from tpPyUtils import settings, osplatform, path as path_utils
 
 os.environ['RIGBUILDER_PATH'] = os.path.abspath(os.path.dirname(__file__))
-os.environ['RIGBULIDER_STOP'] = 'False'
 os.environ['RIGBUILDER_RUN'] = 'False'
+os.environ['RIGBULIDER_STOP'] = 'False'
 os.environ['RIGBUILDER_TEMP_LOG'] = ''
 os.environ['RIGBUILDER_KEEP_TEMP_LOG'] = 'False'
 os.environ['RIGBUILDER_LAST_TEMP_LOG'] = ''
+os.environ['RIGBUILDER_CURRENT_SCRIPT'] = ''
+os.environ['RIGBUILDER_COPIED_SCRIPT'] = ''
+os.environ['RIGBUILDER_SAVE_COMMENT'] = ''
 
 
 def get_library_settings_path():
