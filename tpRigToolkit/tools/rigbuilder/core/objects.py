@@ -226,7 +226,7 @@ class BuildObject(object):
         """
 
         data_folder = data.DataFolder(name=name, file_path=self.get_data_path(),
-                                      data_path=tpRigBuilder.get_data_files_directory())
+                                      data_path=rigbuilder.get_data_files_directory())
         data_type = data_folder.get_data_type()
 
         return data_type
@@ -241,7 +241,7 @@ class BuildObject(object):
         """
 
         data_path = self.get_data_path()
-        data_folder = data.DataFolder(name, data_path, data_path=tpRigBuilder.get_data_files_directory())
+        data_folder = data.DataFolder(name, data_path, data_path=rigbuilder.get_data_files_directory())
         inst = data_folder.get_folder_data_instance()
         if not inst:
             return
@@ -257,7 +257,7 @@ class BuildObject(object):
         """
 
         data_path = self.get_data_path()
-        data_folder = data.DataFolder(name=name, file_path=data_path, data_path=tpRigBuilder.get_data_files_directory())
+        data_folder = data.DataFolder(name=name, file_path=data_path, data_path=rigbuilder.get_data_files_directory())
 
         return data_folder.get_folder_data_instance()
 
@@ -278,7 +278,7 @@ class BuildObject(object):
             test_path = path_utils.unique_path_name(test_path)
         name = path_utils.get_basename(test_path)
 
-        data_folder = data.DataFolder(name=name, file_path=data_path, data_path=tpRigBuilder.get_data_files_directory())
+        data_folder = data.DataFolder(name=name, file_path=data_path, data_path=rigbuilder.get_data_files_directory())
         data_folder.set_data_type(data_type)
         return_path = data_folder.folder_path
 
@@ -440,7 +440,7 @@ class BuildObject(object):
 
         value = self.get_unformatted_option(name, group)
         if value is None:
-            tpRigBuilder.logger.warning(
+            LOGGER.warning(
                 'Impossible to access option with proper format from {}'.format(self._option_settings.directory))
             if self.has_option(name, group):
                 if group:
@@ -469,7 +469,7 @@ class BuildObject(object):
             if key.endswith(name):
                 if return_first:
                     value = self._format_option_value(options_dict[key])
-                    tpRigBuilder.logger.debug('Accessed - Option: {}, value: {}'.format(name, options_dict[key]))
+                    LOGGER.debug('Accessed - Option: {}, value: {}'.format(name, options_dict[key]))
                     return value
                 found[name] = options_dict[key]
 
@@ -875,10 +875,11 @@ class ScriptObject(BuildObject, object):
                             continue
                         common_path = path_utils.get_common_path(code_folders[i], script_name)
                         if common_path:
-                            common_path_name = common_path + '.{}'.format(scripts_list.ScriptExtensions.Python)
+                            common_path_name = common_path + '.{}'.format(scripts.ScriptPythonData.get_data_extension())
                             if common_path_name in synced_scripts:
                                 print(code_folders[i])
-                                code_script = code_folders[i] + '.{}'.format(scripts_list.ScriptExtensions.Python)
+                                code_script = code_folders[i] + '.{}'.format(
+                                    scripts.ScriptPythonData.get_data_extension())
                                 synced_scripts.append(code_script)
                                 synced_states.append(False)
                                 remove_index = i
@@ -886,12 +887,12 @@ class ScriptObject(BuildObject, object):
                     code_folders.pop(remove_index)
 
         for code_folder in code_folders:
-            code_folder += '.{}'.format(consts.DataTypes.Python)
+            code_folder += '.{}'.format(scripts.ScriptPythonData.get_data_extension())
             if code_folder not in synced_scripts:
                 synced_scripts.append(code_folder)
                 synced_states.append(False)
 
-        self.set_scripts_manifest(scripts=synced_scripts, states=synced_states)
+        self.set_scripts_manifest(scripts_to_add=synced_scripts, states=synced_states)
 
     # CODE
     def get_code_path(self):
@@ -1006,7 +1007,7 @@ class ScriptObject(BuildObject, object):
 
         for f in code_folders:
             data_folder = data.DataFolder(
-                name=f, file_path=code_path, data_path=tpRigBuilder.get_data_files_directory()
+                name=f, file_path=code_path, data_path=rigbuilder.get_data_files_directory()
             )
             data_inst = data_folder.get_folder_data_instance()
             if data_inst:
@@ -1028,7 +1029,7 @@ class ScriptObject(BuildObject, object):
 
         code_file = path_utils.join_path(self.get_code_path(), name)
         if not path_utils.is_dir(code_file):
-            tpRigBuilder.logger.warning('Code File: "{}" does not exists!'.format(code_file))
+            LOGGER.warning('Code File: "{}" does not exists!'.format(code_file))
             return
 
         code_name = path_utils.get_basename(code_file)
