@@ -28,6 +28,7 @@ class ScriptItemSignals(QObject, object):
     renameCode = Signal()
     duplicateCode = Signal()
     deleteCode = Signal()
+    browseCode = Signal()
 
 
 class ScriptItem(buildtree.BuildItem, object):
@@ -87,6 +88,7 @@ class ScriptItem(buildtree.BuildItem, object):
         rename_icon = resource.ResourceManager().icon('rename')
         duplicate_icon = resource.ResourceManager().icon('clone')
         delete_icon = resource.ResourceManager().icon('delete')
+        browse_icon = resource.ResourceManager().icon('open')
 
         new_python_action = self._context_menu.addAction(python_icon, 'New Python Code')
         new_data_import_action = self._context_menu.addAction(import_icon, 'New Data Import')
@@ -95,11 +97,14 @@ class ScriptItem(buildtree.BuildItem, object):
         rename_action = self._context_menu.addAction(rename_icon, 'Rename')
         duplicate_action = self._context_menu.addAction(duplicate_icon, 'Duplicate')
         delete_action = self._context_menu.addAction(delete_icon, 'Delete')
+        self._context_menu.addSeparator()
+        browse_action = self._context_menu.addAction(browse_icon, 'Browse')
 
         new_python_action.triggered.connect(self.scriptSignals.createPythonCode.emit)
         rename_action.triggered.connect(self.scriptSignals.renameCode.emit)
         duplicate_action.triggered.connect(self.scriptSignals.duplicateCode.emit)
         delete_action.triggered.connect(self.scriptSignals.deleteCode.emit)
+        browse_action.triggered.connect(self.scriptSignals.browseCode.emit)
 
 
 class ScriptTree(buildtree.BuildTree, object):
@@ -307,6 +312,7 @@ class ScriptTree(buildtree.BuildTree, object):
             item.scriptSignals.renameCode.connect(self._on_rename_current_item)
             item.scriptSignals.duplicateCode.connect(self._on_duplicate_current_item)
             item.scriptSignals.deleteCode.connect(self._on_delete_current_item)
+            item.scriptSignals.browseCode.connect(self._on_browse_code)
 
         # Used to avoid script manifest update when check states of ScriptManifestItem is changed programatically
         if hasattr(item, 'handle_manifest'):
@@ -349,14 +355,20 @@ class ScriptTree(buildtree.BuildTree, object):
 
         python_icon = resource.ResourceManager().icon('python')
         import_icon = resource.ResourceManager().icon('import')
+        browse_icon = resource.ResourceManager().icon('open')
+        refresh_icon = resource.ResourceManager().icon('refresh')
 
         new_python_action = context_menu.addAction(python_icon, 'New Python Code')
         new_data_import_action = context_menu.addAction(import_icon, 'New Data Import')
+        context_menu.addSeparator()
+        browse_action = context_menu.addAction(browse_icon, 'Browse')
+        context_menu.addSeparator()
+        refresh_action = self._context_menu.addAction(refresh_icon, 'Refresh')
 
         new_python_action.triggered.connect(self._on_create_python_code)
         new_data_import_action.triggered.connect(self._on_create_data_import)
-
-        return [new_python_action, new_data_import_action]
+        browse_action.triggered.connect(self._on_browse_code)
+        refresh_action.triggered.connect(self._on_refresh)
 
     # ================================================================================================
     # ======================== BASE
@@ -655,3 +667,30 @@ class ScriptTree(buildtree.BuildTree, object):
                 return
 
         self.itemRemoved.emit(items_paths)
+
+    def _on_browse_code(self):
+        """
+        Internal callback function that is triggered when the user selects Browse Code in script item
+        """
+
+        current_object = self.object()
+        if not current_object:
+            LOGGER.warning('Impossible to browse code because object is not defined!')
+            return
+
+        items = self.selectedItems()
+        if items:
+            item = items[0]
+            code_name = self._get_item_path_name(item)
+            code_path = current_object.get_code_folder(code_name)
+            fileio.open_browser(code_path)
+        else:
+            code_path = current_object.get_code_path()
+            fileio.open_browser(code_path)
+
+    def _on_refresh(self):
+        """
+        Internal callback function that is triggered when the user selects Refresh action
+        """
+
+        self.refresh(sync=True)

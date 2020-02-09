@@ -716,31 +716,19 @@ class BuildTree(treewidgets.FileTreeWidget, object):
         """
         Internal function that creates actions for the creation
         :param context_menu: QMenu
-        :return: list(QAction)
         """
 
-        return list()
+        return None
 
-    # def _create_edit_actions(self, context_menu):
-    #     """
-    #     Internal function that creates actions for the creation of edit items actions
-    #     :param context_menu: QMenu
-    #     :return: list(QAction)
-    #     """
-    #
-    #     return list()
-    #
     # def _create_extra_actions(self, context_menu):
     #     """
     #     Internal function that creates extra actions
     #     :param context_menu: QMenu
     #     """
     #
-    #     refresh_icon = resource.ResourceManager().icon('refresh')
     #     log_icon = resource.ResourceManager().icon('document')
     #     new_window_icon = resource.ResourceManager().icon('new_window')
     #     external_icon = resource.ResourceManager().icon('external')
-    #     browse_icon = resource.ResourceManager().icon('open')
     #     start_point_icon = resource.ResourceManager().icon('finish_flag')
     #     break_point_icon = resource.ResourceManager().icon('record')
     #     cancel_start_point_icon = resource.ResourceManager().icon('cancel_start_point')
