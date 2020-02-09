@@ -9,13 +9,13 @@ from __future__ import print_function, division, absolute_import
 
 from tpQtLib.widgets import treewidgets
 
-from tpRigToolkit.tools.rigbuilder.widgets import outlinertree
+from tpRigToolkit.tools.rigbuilder.widgets import rigtree
 
 
 class RigOutliner(treewidgets.EditFileTreeWidget, object):
 
     description = 'Rig'
-    TREE_WIDGET = outlinertree.RigOutlinerTree
+    TREE_WIDGET = rigtree.RigOutlinerTree
     FILTER_WIDGET = treewidgets.FilterTreeDirectoryWidget
 
     def __init__(self, project=None, settings=None, console=None, parent=None):

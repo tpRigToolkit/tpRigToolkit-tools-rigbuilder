@@ -21,7 +21,7 @@ from tpQtLib.core import qtutils
 
 from tpRigToolkit.core import resource
 from tpRigToolkit.tools.rigbuilder.core import utils
-from tpRigToolkit.tools.rigbuilder.widgets import buildtree
+from tpRigToolkit.tools.rigbuilder.widgets import basetree
 
 LOGGER = logging.getLogger('tpRigToolkit')
 
@@ -37,7 +37,7 @@ class ScriptItemSignals(QObject, object):
     browseCode = Signal()
 
 
-class ScriptItem(buildtree.BuildItem, object):
+class ScriptItem(basetree.BaseItem, object):
 
     scriptSignals = ScriptItemSignals()
 
@@ -189,7 +189,7 @@ class ScriptItem(buildtree.BuildItem, object):
         raise NotImplementedError('open in new window functionality is not implemented yet!')
 
 
-class ScriptTree(buildtree.BuildTree, object):
+class ScriptTree(basetree.BaseTree, object):
 
     HEADER_LABELS = ['Scripts']
     ITEM_WIDGET = ScriptItem

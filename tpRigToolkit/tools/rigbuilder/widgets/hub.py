@@ -15,7 +15,7 @@ from Qt.QtWidgets import *
 import tpQtLib
 from tpQtLib.core import tool
 
-from tpRigToolkit.tools.rigbuilder.widgets import builder, outliner
+from tpRigToolkit.tools.rigbuilder.widgets import builder, rigoutliner
 from tpRigToolkit.tools.rigbuilder.tools import datalibrary, controls, blueprintseditor, properties
 
 
@@ -62,7 +62,7 @@ class HubWidget(tpQtLib.Window, object):
 
         self.setAcceptDrops(True)
 
-        self._outliner = outliner.RigOutliner(settings=self._settings, project=self._project, console=self._console)
+        self._outliner = rigoutliner.RigOutliner(settings=self._settings, project=self._project, console=self._console)
         self._builder = builder.RigBuilder(settings=self._settings, project=self._project, console=self._console)
 
         main_splitter = QSplitter(self)
