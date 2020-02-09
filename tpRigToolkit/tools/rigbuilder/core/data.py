@@ -19,12 +19,12 @@ from tpQtLib.widgets.library import manager
 
 from tpQtLib.widgets.library import items, loadwidget
 
-from tpRigToolkit.tools import rignode
+from tpRigToolkit.tools import rigbuilder
 
 
-class DataFolder(manager.LibraryDataFolder, object):
+class ScriptFolder(manager.LibraryDataFolder, object):
     def __init__(self, name, file_path, data_path=None):
-        super(DataFolder, self).__init__(name=name, file_path=file_path, data_path=data_path)
+        super(ScriptFolder, self).__init__(name=name, file_path=file_path, data_path=data_path)
 
     def get_manager(self):
         """
@@ -33,7 +33,7 @@ class DataFolder(manager.LibraryDataFolder, object):
         :return: LibraryManager
         """
 
-        return rignode.ScriptsMgr()
+        return rigbuilder.ScriptsMgr()
 
 
 class DataPreviewWidget(loadwidget.LoadWidget, object):

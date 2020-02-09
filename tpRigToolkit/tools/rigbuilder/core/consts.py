@@ -9,10 +9,20 @@ from __future__ import print_function, division, absolute_import
 
 from tpDccLib.core import scripts
 
-
+FOLDERS_PREFIX = '__'
+FOLDERS_SUFFIX = '__'
 BLUEPRINTS_FOLDER = '__blueprints__'
-BLUEPRINTS_DATA_FILE = 'data.yml'
-BLUEPRINTS_OPTIONS_FILE = 'options.yml'
+CODE_FOLDER = '__code__'
+DATA_FOLDER = '__data___'
+BACKUP_FOLDER = '__backup__'
+VERSIONS_FOLDER = '__versions__'
+DATA_FILE = 'data'
+VERSION_NAME = 'version'
+MANIFEST_FILE = 'manifest'
+SETTINGS_FILE_NAME = 'settings'
+SETTINGS_FILE_EXTENSION = 'json'
+OPTIONS_FILE_NAME = 'options'
+OPTIONS_FILE_EXTENSION = 'json'
 
 
 class DataTypes(object):
