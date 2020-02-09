@@ -7,12 +7,15 @@ Module that contains widget to show scripts tree
 
 from __future__ import print_function, division, absolute_import
 
+import os
 import logging
 
 from Qt.QtCore import *
 
+import tpDccLib as tp
 from tpDccLib.core import scripts
-from tpPyUtils import fileio, path as path_utils
+from tpPyUtils import osplatform, timers, fileio, path as path_utils
+from tpQtLib.core import qtutils
 
 from tpRigToolkit.core import resource
 from tpRigToolkit.tools.rigbuilder.core import utils
@@ -25,6 +28,7 @@ class ScriptItemSignals(QObject, object):
 
     createPythonCode = Signal()
     createData = Signal()
+    runCode = Signal()
     renameCode = Signal()
     duplicateCode = Signal()
     deleteCode = Signal()
@@ -89,6 +93,8 @@ class ScriptItem(buildtree.BuildItem, object):
         duplicate_icon = resource.ResourceManager().icon('clone')
         delete_icon = resource.ResourceManager().icon('delete')
         browse_icon = resource.ResourceManager().icon('open')
+        external_icon = resource.ResourceManager().icon('external')
+        new_window_icon = resource.ResourceManager().icon('new_window')
 
         new_python_action = self._context_menu.addAction(python_icon, 'New Python Code')
         new_data_import_action = self._context_menu.addAction(import_icon, 'New Data Import')
@@ -99,12 +105,86 @@ class ScriptItem(buildtree.BuildItem, object):
         delete_action = self._context_menu.addAction(delete_icon, 'Delete')
         self._context_menu.addSeparator()
         browse_action = self._context_menu.addAction(browse_icon, 'Browse')
+        external_window_action = self._context_menu.addAction(external_icon, 'Open in External')
+        new_window_action = self._context_menu.addAction(new_window_icon, 'Open in New Window')
 
         new_python_action.triggered.connect(self.scriptSignals.createPythonCode.emit)
+        run_action.triggered.connect(self.scriptSignals.runCode.emit)
         rename_action.triggered.connect(self.scriptSignals.renameCode.emit)
         duplicate_action.triggered.connect(self.scriptSignals.duplicateCode.emit)
         delete_action.triggered.connect(self.scriptSignals.deleteCode.emit)
         browse_action.triggered.connect(self.scriptSignals.browseCode.emit)
+        external_window_action.triggered.connect(self._on_open_in_external)
+        new_window_action.triggered.connect(self._on_open_in_window)
+
+    # ================================================================================================
+    # ======================== BASE
+    # ================================================================================================
+
+    def get_code_name(self, remove_extension=False):
+        """
+        Returns item code path
+        :return: str
+        """
+
+        script_name = path_utils.get_basename(self.get_text(), with_extension=False)
+        script_path = self.get_path()
+        if script_path:
+            script_name = path_utils.join_path(script_path, script_name)
+
+        if remove_extension:
+            return fileio.remove_extension(script_name)
+
+        return script_name
+
+    # ================================================================================================
+    # ======================== CALLBACKS
+    # ================================================================================================
+
+    def _on_open_in_external(self):
+        """
+        Internal callback function that opens script in external editor
+        :param item: ScripItem
+        :return:
+        """
+
+        current_object = self.get_object()
+        if not current_object:
+            LOGGER.warning('Impossible to open script because object is not defined!')
+            return
+
+        code_name = self.get_code_name(remove_extension=True)
+        code_file = current_object.get_code_file(code_name)
+        if not code_file or not os.path.isfile(code_file):
+            LOGGER.warning('Impossible to open script "{}" because it does not exists!'.format(code_file))
+            return
+
+        # TODO: Add support for custom external editors
+        # external_editor = self._settings.get('external_directory')
+        # if external_editor:
+        #     p = subprocess.Popen([external_editor, code_file])
+
+        fileio.open_browser(code_file)
+
+    def _on_open_in_window(self, item=None):
+        """
+        Internal callback function that opens script in script editor
+        :param item: ScripItem
+        :return:
+        """
+
+        current_object = self.get_object()
+        if not current_object:
+            LOGGER.warning('Impossible to open script because object is not defined!')
+            return
+
+        code_name = self.get_code_name(remove_extension=True)
+        code_file = current_object.get_code_file(code_name)
+        if not code_file or not os.path.isfile(code_file):
+            LOGGER.warning('Impossible to open script "{}" because it does not exists!'.format(code_file))
+            return
+
+        raise NotImplementedError('open in new window functionality is not implemented yet!')
 
 
 class ScriptTree(buildtree.BuildTree, object):
@@ -309,6 +389,7 @@ class ScriptTree(buildtree.BuildTree, object):
 
         if not self.itemSignalsConnected:
             item.scriptSignals.createPythonCode.connect(self._on_create_python_code)
+            item.scriptSignals.runCode.connect(self._on_run_current_item)
             item.scriptSignals.renameCode.connect(self._on_rename_current_item)
             item.scriptSignals.duplicateCode.connect(self._on_duplicate_current_item)
             item.scriptSignals.deleteCode.connect(self._on_delete_current_item)
@@ -506,6 +587,45 @@ class ScriptTree(buildtree.BuildTree, object):
 
         return True
 
+    def _run_item(self, item, object=None):
+        """
+        Internal function that launches given ScripItem with given rig
+        :param item: ScriptItem
+        :param object: object
+        """
+
+        if object is None:
+            object = self.object()
+        if not object:
+            LOGGER.warning('Impossible to run script/s because rig is not defined!')
+            return
+
+        self.scrollToItem(item)
+        item.set_state(4)
+        item.setExpanded(True)
+
+        background = item.background(0)
+        orig_background = background
+        color = QColor(1, 0, 0)
+        background.setColor(color)
+        item.setBackground(0, background)
+
+        script_name = self._get_item_path_name(item)
+        code_file = object.get_code_file(script_name)
+
+        status = object.run_script(code_file, False)
+
+        if status == 'Success':
+            item.set_state(1)
+            log = osplatform.get_env_var('RIGBUILDER_LAST_TEMP_LOG')
+            if log:
+                if log.find('Warning') > -1 or log.find('WARNING') > -1 or log.find('warning') > -1:
+                    item.set_state(2)
+        else:
+            item.set_state(0)
+
+        item.setBackground(0, orig_background)
+
     # ================================================================================================
     # ======================== CALLBACKS
     # ================================================================================================
@@ -582,6 +702,85 @@ class ScriptTree(buildtree.BuildTree, object):
         # self.scrollToItem(item)
         # self.setItemSelected(item, True)
         # self.setCurrentItem(item)
+
+    def _on_run_current_item(self, external_code_library=None):
+        """
+        Internal function that executes current item
+        :param external_code_library:
+
+        """
+
+        current_object = self.object()
+        if not current_object:
+            LOGGER.warning('Impossible to run script because object is not defined!')
+            return
+
+        osplatform.set_env_var('__SCRIPT_RUN__', True)
+        osplatform.set_env_var('__SCRIPT_STOP__', False)
+
+        scripts, states = current_object.get_scripts_manifest()
+        items = self.selectedItems()
+        if len(items) > 1:
+            value = qtutils.get_permission('Start a new scene', parent=self)
+            if value:
+                tp.Dcc.new_scene(force=True, do_save=False)
+            else:
+                return
+
+        watch = timers.StopWatch()
+        watch.start(feedback=False)
+
+        for item in items:
+            item.set_state(-1)
+
+        if external_code_library:
+            current_rig.set_external_code_library(external_code_library)
+
+        last_name = items[-1].text(0)
+        last_path = self.get_item_path(items[-1])
+        if last_path:
+            last_name = path_utils.join_path(last_path, last_name)
+
+        set_end_states = False
+        for i in range(len(scripts)):
+            if osplatform.get_env_var('__SCRIPT_RUN__') == 'True':
+                if osplatform.get_env_var('__SCRIPT_STOP__') == 'True':
+                    break
+
+                if set_end_states:
+                    item = self._get_item_by_name(scripts[i])
+                    if item:
+                        item.set_state(-1)
+                for item in items:
+                    script_name = item.text(0)
+                    script_path = self.get_item_path(item)
+                    if script_path:
+                        script_name = path.join_path(script_path, script_name)
+                    if script_name == scripts[i]:
+                        self._run_item(item, current_object)
+                        if not item.isExpanded():
+                            child_count = item.childCount()
+                            if child_count:
+                                item.setExpanded(True)
+                                for i in range(child_count):
+                                    child_item = item.child(i)
+                                    child_item.set_state(-1)
+                                for i in range(child_count):
+                                    child_item = item.child(i)
+                                    self._run_item(child_item, current_object)
+                                item.setExpanded(False)
+
+                        if script_name == last_name:
+                            set_end_states = True
+
+        osplatform.set_env_var('__SCRIPT_RUN__', False)
+        osplatform.set_env_var('__SCRIPT_STOP__', False)
+
+        minutes, seconds = watch.stop()
+        if minutes:
+            LOGGER.info('Rig Scripts run in {} minutes and {} seconds'.format(minutes, seconds))
+        else:
+            LOGGER.info('Rig Scripts run in {} seconds'.format(seconds))
 
     def _on_rename_current_item(self):
         """

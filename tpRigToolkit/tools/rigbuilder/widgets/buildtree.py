@@ -15,13 +15,12 @@ from Qt.QtWidgets import *
 from Qt.QtGui import *
 
 import tpDccLib as tp
-from tpPyUtils import decorators, fileio, timers, osplatform, path as path_utils
-from tpDccLib.core import scripts
+from tpPyUtils import fileio, path as path_utils
 from tpQtLib.core import qtutils
 from tpQtLib.widgets import treewidgets
 
 from tpRigToolkit.core import resource
-from tpRigToolkit.tools.rigbuilder.core import consts, utils
+from tpRigToolkit.tools.rigbuilder.core import utils
 
 LOGGER = logging.getLogger('tpRigToolkit')
 
@@ -36,6 +35,7 @@ class BuildItem(treewidgets.TreeWidgetItem, object):
     def __init__(self, parent=None):
 
         self._log = ''
+        self._object = None
         self._run_state = -1
         self._context_menu = None
 
@@ -97,6 +97,43 @@ class BuildItem(treewidgets.TreeWidgetItem, object):
 
         text = '   ' + text
         super(BuildItem, self).setText(0, text)
+
+    def get_path(self):
+        """
+        Returns the path to an item from the top tree level to down
+        :return: str
+        """
+
+        parent = self.parent()
+        parent_path = ''
+
+        while parent:
+            parent_name = parent.text(0)
+            parent_name = parent_name.split('.')[0]
+            if parent_path:
+                parent_path = path_utils.join_path(parent_name, parent_path)
+            else:
+                parent_path = parent_name
+
+            parent = parent.parent()
+
+        return parent_path
+
+    def get_object(self):
+        """
+        Returns object this item is linked to
+        :return: object
+        """
+
+        return self._object
+
+    def set_object(self, object):
+        """
+        Sets the object this item is linked to
+        :param object: object
+        """
+
+        self._object = object
 
     def log(self):
         """
@@ -669,6 +706,43 @@ class BuildTree(treewidgets.FileTreeWidget, object):
         self.cancel_start_point()
         self.cancel_break_point()
 
+    def reset_items_state(self):
+        """
+        Resets the states of all objects
+        """
+
+        items = self._get_all_items()
+        for item in items:
+            item.set_state(-1)
+
+    def set_item_state(self, directory, state):
+        """
+        Sets the state of the item
+        :param directory: str
+        :param state: int
+        """
+
+        item_name = directory
+        item = self._get_item_by_name(item_name)
+        if not item:
+            return
+        if state > -1:
+            self.scrollToItem(item)
+        item.set_state(state)
+
+    def set_item_log(self, directory, log):
+        """
+        Sets the item log
+        :param directory: str
+        :param log: str
+        """
+
+        item_name = directory
+        item = self._get_item_by_name(item_name)
+        if not item:
+            return
+        item.set_log(log)
+
     # ================================================================================================
     # ======================== ITEMS
     # ================================================================================================
@@ -680,20 +754,7 @@ class BuildTree(treewidgets.FileTreeWidget, object):
         :return: str
         """
 
-        parent = item.parent()
-        parent_path = ''
-
-        while parent:
-            parent_name = parent.text(0)
-            parent_name = parent_name.split('.')[0]
-            if parent_path:
-                parent_path = path_utils.join_path(parent_name, parent_path)
-            else:
-                parent_path = parent_name
-
-            parent = parent.parent()
-
-        return parent_path
+        return item.get_path()
 
     # ================================================================================================
     # ======================== INTERNAL
@@ -807,6 +868,8 @@ class BuildTree(treewidgets.FileTreeWidget, object):
             item.setFlags(
                 Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsEnabled |
                 Qt.ItemIsDragEnabled | Qt.ItemIsUserCheckable)
+
+        item.set_object(self.object())
 
     def _get_item_path_name(self, item, keep_extension=False):
         """
