@@ -40,7 +40,7 @@ class ScriptObject(build.BuildObject, object):
     MANIFEST_FOLDER = consts.MANIFEST_FOLDER
     DESCRIPTION = 'script'
 
-    def __init__(self, name):
+    def __init__(self, name=None):
         super(ScriptObject, self).__init__(name=name)
 
         self._external_code_paths = list()
@@ -770,7 +770,7 @@ class ScriptObject(build.BuildObject, object):
             data_type = consts.DataTypes.Python
             return data_type
 
-        data_folder = data.DataFolder(name, self.get_code_path())
+        data_folder = data.ScriptFolder(name, self.get_code_path())
         data_type = data_folder.get_data_type()
 
         return data_type

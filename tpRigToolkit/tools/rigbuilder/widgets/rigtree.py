@@ -535,23 +535,33 @@ class RigOutlinerTree(basetree.BaseTree, object):
 
         self._context_menu = QMenu()
 
-        self._new_rig_action = self._context_menu.addAction('New Rig')
-        self._new_top_level_rig_action = self._context_menu.addAction('New Top Level Rig')
+        add_icon = resource.ResourceManager().icon('add')
+        rename_icon = resource.ResourceManager().icon('rename')
+        duplicate_icon = resource.ResourceManager().icon('clone')
+        copy_icon = resource.ResourceManager().icon('copy')
+        paste_icon = resource.ResourceManager().icon('paste')
+        merge_icon = resource.ResourceManager().icon('merge')
+        delete_icon = resource.ResourceManager().icon('delete')
+        browse_icon = resource.ResourceManager().icon('open')
+        refresh_icon = resource.ResourceManager().icon('refresh')
+
+        self._new_rig_action = self._context_menu.addAction(add_icon, 'New Rig')
+        self._new_top_level_rig_action = self._context_menu.addAction(add_icon, 'New Top Level Rig')
         self._context_menu.addSeparator()
         self._convert_folder_action = self._context_menu.addAction('Convert Folder to Rig')
         self._context_menu.addSeparator()
-        self._rename_action = self._context_menu.addAction('Rename')
-        self._duplicate_action = self._context_menu.addAction('Duplicate')
-        self._copy_action = self._context_menu.addAction('Copy')
-        self._paste_action = self._context_menu.addAction('Paste')
-        self._merge_action = self._context_menu.addAction('Merge')
-        self._merge_with_sub_action = self._context_menu.addAction('Merge with Sub Folders')
-        self._copy_special_action = self._context_menu.addAction('Copy Match')
-        self._delete_action = self._context_menu.addAction('Delete')
+        self._rename_action = self._context_menu.addAction(rename_icon, 'Rename')
+        self._duplicate_action = self._context_menu.addAction(duplicate_icon, 'Duplicate')
+        self._copy_action = self._context_menu.addAction(copy_icon, 'Copy')
+        self._paste_action = self._context_menu.addAction(paste_icon, 'Paste')
+        self._merge_action = self._context_menu.addAction(merge_icon, 'Merge')
+        self._merge_with_sub_action = self._context_menu.addAction(merge_icon, 'Merge with Sub Folders')
+        self._copy_special_action = self._context_menu.addAction(copy_icon, 'Copy Match')
+        self._delete_action = self._context_menu.addAction(delete_icon, 'Delete')
         self._context_menu.addSeparator()
         self._context_menu.addSeparator()
-        self._show_in_explorer_action = self._context_menu.addAction('Show in Explorer')
-        self._refresh_action = self._context_menu.addAction('Refresh')
+        self._show_in_explorer_action = self._context_menu.addAction(browse_icon, 'Show in Explorer')
+        self._refresh_action = self._context_menu.addAction(refresh_icon, 'Refresh')
 
         self._convert_folder_action.setVisible(False)
         self._paste_action.setVisible(False)
@@ -895,7 +905,7 @@ class RigOutlinerTree(basetree.BaseTree, object):
         else:
             target_item = None
         if not target_rig:
-            target_rig = rig.Rig()
+            target_rig = rig.RigObject()
             target_rig.set_directory(self._directory)
             target_rig.set_library(self.library())
             target_item = None
@@ -912,7 +922,7 @@ class RigOutlinerTree(basetree.BaseTree, object):
         self.scrollToItem(new_item)
 
         self.pasteRig.emit(new_item)
-        self.get_console().write_ok('RigTree >> paste_rig >> Rig {} pasted to clipboard!'.format(new_item.get_name()))
+        self.get_console().write_ok('RigTree >> paste_rig >> Rig {} pasted from clipboard!'.format(new_item.get_name()))
 
     def merge_rig(self, source_rig=None, sub_rig_merge=False):
         """

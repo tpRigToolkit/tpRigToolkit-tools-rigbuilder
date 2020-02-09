@@ -12,12 +12,12 @@ __license__ = "MIT"
 __maintainer__ = "Tomas Poveda"
 __email__ = "tpovedatd@gmail.com"
 
-
+import string
 import logging
 
-from tpPyUtils import path as path_utils
+from tpPyUtils import folder, path as path_utils
 
-from tpRigToolkit.tools.rigbuilder.objects import script
+from tpRigToolkit.tools.rigbuilder.objects import helpers, script
 
 LOGGER = logging.getLogger('tpRigToolkit')
 
@@ -26,7 +26,7 @@ class RigObject(script.ScriptObject, object):
 
     DESCRIPTION = 'rig'
 
-    def __init__(self, name):
+    def __init__(self, name=None):
         super(RigObject, self).__init__(name=name)
 
         self._library = None
@@ -63,7 +63,7 @@ class RigObject(script.ScriptObject, object):
 
         self._library = library
 
-    def get_parent_object(self):
+    def get_parent_rig(self):
         """
         Returns parent rig of current one
         :return: variant, Rig or None
@@ -71,20 +71,20 @@ class RigObject(script.ScriptObject, object):
 
         object_path = self.get_path()
         dir_name = path_utils.get_dirname(object_path)
-        rig_inst = self.__class__()
+        rig_inst = RigObject()
         rig_inst.set_directory(dir_name)
 
         if rig_inst.check():
             object_name = path_utils.get_basename(dir_name)
             object_dir = path_utils.get_dirname(dir_name)
-            parent_object = Rig(object_name)
+            parent_object = RigObject(object_name)
             parent_object.set_directory(object_dir)
             LOGGER.debug('Parent Rig: {}'.format(parent_object.get_path()))
             return parent_object
 
         return None
 
-    def get_relative_object(self, relative_path):
+    def get_relative_rig(self, relative_path):
         """
         Returns instance of an object in the relative path
         :param relative_path: str
@@ -125,30 +125,30 @@ class RigObject(script.ScriptObject, object):
         object_name = string.join([new_path[-1]], '/')
         object_directory = string.join(new_path[:-1], '/')
 
-        object_inst = self.__class__(object_name)
+        object_inst = RigObject(object_name)
         object_inst.set_directory(object_directory)
 
         return object_inst
 
-    def get_sub_objects(self):
+    def get_sub_rigs(self):
         """
         Returns the objects names found directly under the current object
         :return: list(str)
         """
 
         object_path = self.get_path()
-        found = helpers.find_rigs(object_path)
+        found = helpers.RigHelpers.find_rigs(object_path)
 
         return found
 
-    def get_sub_object(self, rig_name):
+    def get_sub_rig(self, rig_name):
         """
         Returns sub rig if there is one that matches given name
         :param rig_name: str, name of a child rig
         :return: Rig
         """
 
-        rig_inst = Rig(rig_name)
+        rig_inst = RigObject(rig_name)
         rig_inst.set_directory(self.get_path())
 
         return rig_inst
@@ -162,7 +162,7 @@ class RigObject(script.ScriptObject, object):
 
         found = self.get_sub_rigs()
         if index < len(found):
-            sub_rig = Rig(found[index])
+            sub_rig = RigObject(found[index])
             sub_rig.set_directory(self.get_path())
             return sub_rig
 
@@ -177,3 +177,63 @@ class RigObject(script.ScriptObject, object):
         found = self.get_sub_rigs()
         if found:
             return len(found)
+
+    def add_part(self, name):
+        """
+        Adsd given part to the rig
+        :param name: str
+        :return: Rig, instance of the given part
+        """
+
+        part_rig = RigObject(name)
+        if self._name:
+            path = path_utils.join_path(self._directory, self._name)
+        else:
+            path = self._directory
+
+        part_rig.set_directory(path)
+        part_rig.create()
+
+        return part_rig
+
+    def has_sub_parts(self):
+        """
+        Returns whether current rig has sub parts or not
+        :return: bool
+        """
+
+        rig_path = self.get_path()
+        if not rig_path:
+            return False
+
+        files = folder.get_folders(rig_path)
+        if not files:
+            return False
+
+        for filename in files:
+            file_path = path_utils.join_path(rig_path, filename)
+            if helpers.RigHelpers.is_rig(file_path):
+                return True
+
+        return False
+
+    def get_non_rig_parts(self):
+        """
+        Returns all non rig parts of current rig
+        :return: list(str)
+        """
+
+        found = list()
+
+        rig_path = self.get_path()
+        if not rig_path:
+            return found
+
+        folders = folder.get_folders(rig_path)
+        for f in folders:
+            full_path = path_utils.join_path(rig_path, f)
+            if not helpers.RigHelpers.is_rig(full_path):
+                continue
+            found.append(full_path)
+
+        return found

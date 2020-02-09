@@ -18,7 +18,7 @@ import logging
 import __builtin__      # Not remove because its used to clean rig script builtins
 
 import tpDccLib as tp
-from tpPyUtils import folder, fileio, version, path as path_utils
+from tpPyUtils import osplatform, folder, fileio, version, path as path_utils
 
 from tpRigToolkit.tools import rigbuilder
 from tpRigToolkit.tools.rigbuilder.core import consts
@@ -341,7 +341,7 @@ class RigHelpers(ScriptHelpers, object):
                 target_rig = parent_task
 
         rig_path = target_rig.get_path()
-        new_rig_name = get_unused_rig_name(rig_path, source_name)
+        new_rig_name = RigHelpers.get_unused_rig_name(rig_path, source_name)
         new_rig = target_rig.add_part(new_rig_name)
 
         data_folders = source_rig.get_data_folders()
@@ -362,11 +362,11 @@ class RigHelpers(ScriptHelpers, object):
         for sub_folder in sub_folders:
             sub_rig = new_rig.get_sub_rig(sub_folder)
             source_sub_rig = source_rig.get_sub_rig(sub_folder)
-            if not sub_rig.is_task():
+            if not sub_rig.is_rig():
                 RigHelpers.copy_rig(source_sub_rig, new_rig)
 
         if scripts_manifest_found:
-            RigHelpers.copy_rig_code(source_rig, new_rig, '{}'.format(rig.Rig.MANIFEST_FILE_NAME))
+            RigHelpers.copy_rig_code(source_rig, new_rig, '{}'.format(rig.RigObject.MANIFEST_FILE))
 
         for setting in settings:
             RigHelpers.copy_rig_setting(source_rig, new_rig, setting)
@@ -421,7 +421,7 @@ class RigHelpers(ScriptHelpers, object):
                     RigHelpers.copy_rig(source_sub_rig, sub_rig)
 
         if scripts_manifest_found:
-            RigHelpers.copy_rig_code(source_rig, target_rig, '{}'.format(rig.Rig.MANIFEST_FILE_NAME))
+            RigHelpers.copy_rig_code(source_rig, target_rig, '{}'.format(rig.RigObject.MANIFEST_FILE))
 
         for setting in settings:
             RigHelpers.copy_rig_setting(source_rig, target_rig, setting)
@@ -464,8 +464,8 @@ class RigHelpers(ScriptHelpers, object):
 
         file_path = data_inst.get_file_direct(sub_folder)
         if file_path:
-            file_name = path.get_basename(file_path)
-            target_dir = path.join_path(data_folder_path, file_name)
+            file_name = path_utils.get_basename(file_path)
+            target_dir = path_utils.join_path(data_folder_path, file_name)
             if not path_utils.is_dir(data_folder_path):
                 folder.create_folder(data_folder_path)
             if sub_folder:
@@ -559,9 +559,9 @@ class RigHelpers(ScriptHelpers, object):
 
         target_path = target_rig.get_path()
         target_file_path = target_rig.get_setting_file(setting_name)
-        if path.is_file(target_file_path):
-            file_name = path.get_basename(target_file_path)
-            file_dir = path.get_dirname(target_file_path)
+        if path_utils.is_file(target_file_path):
+            file_name = path_utils.get_basename(target_file_path)
+            file_dir = path_utils.get_dirname(target_file_path)
             fileio.delete_file(file_name, file_dir)
 
         fileio.copy_file(file_path, target_path)
