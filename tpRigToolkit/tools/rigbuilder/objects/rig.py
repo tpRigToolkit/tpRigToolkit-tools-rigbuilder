@@ -29,8 +29,6 @@ class RigObject(script.ScriptObject, object):
     def __init__(self, name=None):
         super(RigObject, self).__init__(name=name)
 
-        self._library = None
-
     # ================================================================================================
     # ======================== BASE
     # ================================================================================================
@@ -46,22 +44,6 @@ class RigObject(script.ScriptObject, object):
                 return False
 
         return True
-
-    def library(self):
-        """
-        Returns data library linked to this widget
-        :return: Library
-        """
-
-        return self._library
-
-    def set_library(self, library):
-        """
-        Sets the data library linked to this item
-        :param library: Library
-        """
-
-        self._library = library
 
     def get_parent_rig(self):
         """

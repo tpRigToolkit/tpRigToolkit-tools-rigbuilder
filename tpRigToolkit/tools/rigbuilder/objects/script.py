@@ -18,10 +18,9 @@ import traceback
 
 import tpDccLib as tp
 from tpDccLib.core import scripts
-from tpPyUtils import log, python, folder, fileio, timers, version, path as path_utils, name as name_utils
+from tpPyUtils import log, osplatform, python, folder, fileio, timers, version, path as path_utils, name as name_utils
 
-from tpRigToolkit.tools import rigbuilder
-from tpRigToolkit.tools.rigbuilder.core import consts, data
+from tpRigToolkit.tools.rigbuilder.core import consts, utils, data
 from tpRigToolkit.tools.rigbuilder.objects import helpers, build
 
 LOGGER = logging.getLogger('tpRigToolkit')
@@ -248,7 +247,7 @@ class ScriptObject(build.BuildObject, object):
         Run all the scripts in the script manifest (taking into account their on/off state)
         """
 
-        prev_task = osplatform.get_env_var('RIGBUILDER_CURRENT_SCRIPT')
+        prev_script = osplatform.get_env_var('RIGBUILDER_CURRENT_SCRIPT')
         osplatform.set_env_var('RIGBUILDER_CURRENT_SCRIPT', self.get_path())
         LOGGER.info('---------------------------------------------------------------')
 
@@ -315,7 +314,8 @@ class ScriptObject(build.BuildObject, object):
 
                 try:
                     status = self.run_script(script, hard_error=False)
-                except:
+                except Exception as exc:
+                    LOGGER.error('Error while executing script: {} | {}'.format(exc, traceback.format_exc()))
                     status = ScriptStatus.FAIL
 
                 if not status == ScriptStatus.SUCCESS:
@@ -348,9 +348,9 @@ class ScriptObject(build.BuildObject, object):
         LOGGER.debug('\n\n')
         for status_entry in status_list:
             LOGGER.debug('{} : {}'.format(status_entry[1], status_entry[0]))
-        LOGGER.logger.debug('\n\n')
+        LOGGER.debug('\n\n')
 
-        osplatform.set_env_var('RIGBUILDER_CURRENT_SCRIPT', prev_task)
+        osplatform.set_env_var('RIGBUILDER_CURRENT_SCRIPT', prev_script)
 
         if manage_node_editor_inst:
             manage_node_editor_inst.restore_add_new_nodes()
@@ -788,7 +788,7 @@ class ScriptObject(build.BuildObject, object):
 
         for f in code_folders:
             data_folder = data.DataFolder(
-                name=f, file_path=code_path, data_path=rigbuilder.get_data_files_directory()
+                name=f, file_path=code_path, data_path=utils.get_data_files_directory()
             )
             data_inst = data_folder.get_folder_data_instance()
             if data_inst:
@@ -878,7 +878,7 @@ class ScriptObject(build.BuildObject, object):
                 test_path = path_utils.unique_path_name(test_path)
                 name = path_utils.get_basename(test_path)
 
-        data_folder = data.ScriptFolder(name, code_path, data_path=rigbuilder.get_data_files_directory())
+        data_folder = data.ScriptFolder(name, code_path, data_path=utils.get_data_files_directory())
         data_folder.set_data_type(data_type)
         data_inst = data_folder.get_folder_data_instance()
         if not data_inst:
@@ -983,7 +983,7 @@ class ScriptObject(build.BuildObject, object):
         Internal function used to reset current builtin variables
         """
 
-        helpers.reset_code_bultins(self)
+        helpers.ScriptHelpers.reset_code_bultins(self)
 
     def _source_script(self, script):
         """
@@ -994,7 +994,7 @@ class ScriptObject(build.BuildObject, object):
 
         python.delete_pyc_file(script)
         self._reset_builtin()
-        helpers.setup_code_builtins(self)
+        helpers.ScriptHelpers.setup_code_builtins(self)
 
         LOGGER.info('Sourcing: {}'.format(script))
 

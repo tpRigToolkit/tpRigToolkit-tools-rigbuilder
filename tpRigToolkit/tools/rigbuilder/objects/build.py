@@ -13,13 +13,12 @@ __maintainer__ = "Tomas Poveda"
 __email__ = "tpovedatd@gmail.com"
 
 import os
-import string
 import logging
 
 from tpPyUtils import folder, settings, version, path as path_utils
 
-from tpRigToolkit.tools import rigbuilder
-from tpRigToolkit.tools.rigbuilder.core import consts, data
+from tpRigToolkit.tools.rigbuilder.core import consts, utils, data
+from tpRigToolkit.tools.rigbuilder.objects import helpers
 
 LOGGER = logging.getLogger('tpRigToolkit')
 
@@ -44,6 +43,7 @@ class BuildObject(object):
         self._name = name
         self._directory = folder.get_current_working_directory()
         self._settings = None
+        self._library = None
         self._option_settings = None
         self._option_values = dict()
 
@@ -127,6 +127,22 @@ class BuildObject(object):
 
         return path_utils.get_basename(name)
 
+    def library(self):
+        """
+        Returns data library linked to this widget
+        :return: Library
+        """
+
+        return self._library
+
+    def set_library(self, library):
+        """
+        Sets the data library linked to this item
+        :param library: Library
+        """
+
+        self._library = library
+
     def get_setting_file(self, name):
         """
         Returns settings or option file depending of the setting name given
@@ -186,10 +202,9 @@ class BuildObject(object):
     # ======================== CREATE / LOAD
     # ================================================================================================
 
-    def load(self, rig_name):
+    def load(self):
         """
-        Loads the given rig into the instance
-        :param rig_name: str
+        Loads the given build object into the instance
         """
 
         self._refresh()
@@ -268,7 +283,7 @@ class BuildObject(object):
         """
 
         data_folder = data.DataFolder(name=name, file_path=self.get_data_path(),
-                                      data_path=rigbuilder.get_data_files_directory())
+                                      data_path=utils.get_data_files_directory())
         data_type = data_folder.get_data_type()
 
         return data_type
@@ -283,7 +298,7 @@ class BuildObject(object):
         """
 
         data_path = self.get_data_path()
-        data_folder = data.DataFolder(name, data_path, data_path=rigbuilder.get_data_files_directory())
+        data_folder = data.DataFolder(name, data_path, data_path=utils.get_data_files_directory())
         inst = data_folder.get_folder_data_instance()
         if not inst:
             return
@@ -299,7 +314,7 @@ class BuildObject(object):
         """
 
         data_path = self.get_data_path()
-        data_folder = data.DataFolder(name=name, file_path=data_path, data_path=rigbuilder.get_data_files_directory())
+        data_folder = data.DataFolder(name=name, file_path=data_path, data_path=utils.get_data_files_directory())
 
         return data_folder.get_folder_data_instance()
 
@@ -320,7 +335,7 @@ class BuildObject(object):
             test_path = path_utils.unique_path_name(test_path)
         name = path_utils.get_basename(test_path)
 
-        data_folder = data.DataFolder(name=name, file_path=data_path, data_path=rigbuilder.get_data_files_directory())
+        data_folder = data.DataFolder(name=name, file_path=data_path, data_path=utils.get_data_files_directory())
         data_folder.set_data_type(data_type)
         return_path = data_folder.folder_path
 
@@ -333,6 +348,271 @@ class BuildObject(object):
             return_path = folder.create_folder(sub_folder_path)
 
         return return_path
+
+    def get_data_sub_path(self, name):
+        """
+        Returns the path where data sub folders are stored
+        :param name: str
+        :return: str
+        """
+
+        data_sub_path = self._create_sub_data_folder(data_name=name)
+
+        return data_sub_path
+
+    def get_data_sub_folder_names(self, data_name):
+        """
+        Return data sub folders
+        :param data_name: str, data name
+        :return: list<str>
+        """
+
+        sub_folder = self.get_data_sub_path(data_name)
+        sub_folders = folder.get_folders(sub_folder)
+
+        return sub_folders
+
+    def has_sub_folder(self, data_name, sub_folder_name):
+        """
+        Returns if the data folder has given sub folder stored in it
+        :param data_name: str, data name
+        :param sub_folder_name: str, sub bolder data name
+        :return: bool
+        """
+
+        sub_folders = self.get_data_sub_folder_names(data_name)
+        if sub_folder_name in sub_folders:
+            return True
+
+        return False
+
+    def get_data_current_sub_folder(self, name):
+        """
+        Returns the current data sub folder
+        :param name: str
+        :return: str
+        """
+
+        data_folder = data.ScriptFolder(
+            name=name, file_path=self.get_data_path(), data_path=utils.get_data_files_directory())
+        sub_folder = data_folder.get_current_sub_folder()
+
+        return sub_folder
+
+    def get_data_current_sub_folder_and_type(self, name):
+        """
+        Returns the current data sub folder and its data type
+        :param name: str
+        :return: lsit<str, str>
+        """
+
+        data_folder = data.ScriptFolder(
+            name=name, file_path=self.get_data_path(), data_path=tpRigBuilder.get_data_files_directory())
+        data_type = data_folder.get_data_type()
+        sub_folder = data_folder.get_sub_folder()
+
+        return sub_folder, data_type
+
+    def create_sub_folder(self, data_name, sub_folder_name):
+        """
+        Creates a new data sub folder
+        :param data_name: str, name of the data sub folder
+        :param sub_folder_name: str, sub folder name
+        :return: str
+        """
+
+        data_type = self.get_data_type(data_name)
+        return self.create_data(data_name, data_type, sub_folder_name)
+
+    def copy_sub_folder_to_data(self, sub_folder_name, data_name):
+        """
+        Copies sub folder into data folder
+        :param sub_folder_name: str
+        :param data_name: str
+        """
+
+        if not self.has_sub_folder(data_name, sub_folder_name):
+            LOGGER.warning('Data {} has no sub folder: {} to copy from!'.format(data_name, sub_folder_name))
+            return
+
+        source_file = self.get_data_file_or_folder(data_name, sub_folder_name)
+        target_file = self.get_data_file_or_folder(data_name)
+
+        helpers.ObjectsHelpers.copy(source_file, target_file)
+
+    def copy_data_to_sub_folder(self, data_name, sub_folder_name):
+        """
+        Copies data folder into data sub folder
+        :param data_name:
+        :param sub_folder_name:
+        """
+
+        if not self.has_sub_folder(data_name, sub_folder_name):
+            LOGGER.warning('Data {} has no sub folder: {} to copy to!'.format(data_name, sub_folder_name))
+            return
+
+        source_file = self.get_data_file_or_folder(data_name)
+        target_file = self.get_data_file_or_folder(data_name, sub_folder_name)
+
+        helpers.ObjectsHelpers.copy(source_file, target_file)
+
+    def open_data(self, name, sub_folder=None):
+        """
+        Run open_data function on the data widget associated to the given data name
+        :param name: str, name of a data folder in the rig
+        :param sub_folder: bool
+        """
+
+        data_folder_name = self.get_data_folder(name)
+        LOGGER.debug('Open data in: {}'.format(data_folder_name))
+        if not path_utils.is_dir(data_folder_name):
+            LOGGER.warning('{} data does not exists in {}!'.format(name, self.get_name()))
+            return
+
+        inst, original_sub_folder = self._get_data_instance(name, sub_folder)
+        if hasattr(inst, 'import_data') and not hasattr(inst, 'open'):
+            value = inst.import_data()
+            inst.set_sub_folder(original_sub_folder)
+            return value
+        if hasattr(inst, 'open'):
+            value = inst.open()
+            inst.set_sub_folder(original_sub_folder)
+            return value
+        else:
+            LOGGER.warning('Could not open data {} in rig {}. It has no open function'.format(name, self.get_name()))
+
+    def import_data(self, name, sub_folder=None):
+        """
+        Runs import_data function found on the data widget associated to the given data name
+        :param name:str, name of a data folder in the rig
+        :param sub_folder: str
+        """
+
+        data_folder_name = self.get_data_folder(name)
+        LOGGER.info('Import data from: {}'.format(data_folder_name))
+        if not path_utils.is_dir(data_folder_name):
+            LOGGER.warning('{} data does not exists in {}!'.format(name, self.get_name()))
+            return
+
+        if not self.library():
+            return
+        if not self.library().manager():
+            return
+        item = self.library().manager().item_from_path(data_folder_name)
+        value = item.import_data()
+        print(value)
+
+        # inst, original_sub_folder = self._get_data_instance(name, sub_folder)
+        # if hasattr(inst, 'import_data'):
+        #     value = inst.import_data()
+        #     inst.set_sub_folder(original_sub_folder)
+        #     return value
+        # else:
+        #     tpRigBuilder.logger.error('Could not import data {} in rig {}. It has no import function'.format(name, self.get_name()))
+
+    def reference_data(self, name, sub_folder=None):
+        """
+        Tries to reference the current process data
+        :param name: str, name of a data folder in the rig
+        :param sub_folder: bool
+        :return:
+        """
+
+        data_folder_name = self.get_data_folder(name)
+        LOGGER.debug('Reference data in {}'.format(data_folder_name))
+        if not path_utils.is_dir(data_folder_name):
+            LOGGER.warning('{} data does not exists in {}'.format(name, self.get_name()))
+            return
+
+        instance, original_sub_folder = self._get_data_instance(name, sub_folder)
+        return_value = None
+        if hasattr(instance, 'reference_data'):
+            return_value = instance.reference_data()
+        else:
+            LOGGER.warning(
+                'Could not reference data {0} in rig {1}. {1} has no reference function'.format(name, self.get_name()))
+
+        instance.set_sub_folder(original_sub_folder)
+
+        return return_value
+
+    def save_data(self, name, comment='', sub_folder=None):
+        """
+        Tries the run the save function of the current rig data
+        :param name: str, name of a data folder in the rig
+        :param comment: str
+        :param sub_folder: bool
+        :return: bool
+        """
+
+        instance, original_sub_folder = self._get_data_instance(name, sub_folder)
+        if not comment:
+            comment = 'Saved through rig class with no comment'
+        if hasattr(instance, 'save'):
+            saved = instance.save(comment)
+            instance.set_sub_folder(original_sub_folder)
+            if saved:
+                return True
+
+        return False
+
+    def export_data(self, name, comment='', sub_folder=None):
+        """
+        Tries to run the export function ot the current rig data
+        :param name: str, name of the data folder in the rig
+        :param comment: str
+        :param sub_folder: bool
+        :return: bool
+        """
+
+        instance, original_sub_folder = self._get_data_instance(name, sub_folder)
+        if not comment:
+            comment = 'Exported through rig class with no comment'
+        if hasattr(instance, 'export_data'):
+            exported = instance.export_data(comment)
+            instance.set_sub_folder(original_sub_folder)
+            if exported:
+                return True
+
+        return False
+
+    def rename_data(self, old_name, new_name):
+        """
+        Renames the data folder specified with old_name to the new_name
+        :param old_name: str, current name of the data
+        :param new_name: str, new name for the data
+        :return: str, new path to the data if rename operation was successful
+        """
+
+        data_folder = data.ScriptFolder(old_name, self.get_data_path(), data_path=utils.get_data_files_directory())
+        return data_folder.rename(new_name)
+
+    def delete_data(self, name, sub_folder=None):
+        """
+        Deletes the given data folder from disk
+        :param name: str, name of the data folder on the rig to delete
+        :param sub_folder: str, data sub folder to delete (optional)
+        """
+
+        data_folder = data.ScriptFolder(name, self.get_data_path(), data_path=utils.get_data_files_directory())
+        data_folder.set_sub_folder(sub_folder)
+        data_folder.delete()
+
+    def clean_student_license(self, name):
+        """
+        Clean student license from given file
+        :param name: name of a data folder in the rig
+        """
+
+        data_folder_name = self.get_data_folder(name)
+        LOGGER.debug('Cleaning Student License in: {}'.format(data_folder_name))
+        if not path_utils.is_dir(data_folder_name):
+            LOGGER.warning('{} data does not exists in {}!'.format(name, self.get_name()))
+            return
+
+        inst, original_sub_folder = self._get_data_instance(name, None)
+        if hasattr(inst, 'clean_student_license'):
+            inst.clean_student_license()
 
     # ================================================================================================
     # ======================== SETTINGS
@@ -656,3 +936,35 @@ class BuildObject(object):
                 new_value = value.split(',')
 
         return new_value
+
+    def _create_sub_data_folder(self, data_name):
+        """
+        Internal function used to create sub data folders
+        :param data_name: str, name of the data folder
+        :return: str
+        """
+
+        data_path = self.get_data_folder(data_name)
+        sub_path = folder.create_folder(self.SUB_DATA_FOLDER_NAME, data_path)
+
+        return sub_path
+
+
+    def _get_data_instance(self, name, sub_folder):
+        """
+        Internal function used to retrieve data widget associated to the given data name
+        :param name: str, name of data in the rig
+        :param sub_folder: str, sub folder where data is located
+        :return: tuple<DataWidget, str>, data widget and sub folder tuple
+        """
+
+        data_folder = data.ScriptFolder(
+            name=name, file_path=self.get_data_path(), data_path=utils.get_data_files_directory())
+        current_sub_folder = sub_folder
+        if sub_folder and sub_folder is not False:
+            current_sub_folder = data_folder.get_current_sub_folder()
+            data_folder.set_sub_folder(sub_folder)
+
+        inst = data_folder.get_folder_data_instance()
+
+        return inst, current_sub_folder

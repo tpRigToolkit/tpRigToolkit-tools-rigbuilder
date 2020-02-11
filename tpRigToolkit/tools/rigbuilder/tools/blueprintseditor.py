@@ -14,13 +14,12 @@ from functools import partial
 from Qt.QtCore import *
 from Qt.QtWidgets import *
 
-from tpPyUtils import yamlio, path as path_utils
 from tpQtLib.core import base, tool
 from tpQtLib.widgets import stack, options
 
 from tpRigToolkit.core import resource
 from tpRigToolkit.tools.rigbuilder.core import consts, utils
-from tpRigToolkit.tools.rigbuilder.objects import blueprint
+from tpRigToolkit.tools.rigbuilder.objects import helpers, blueprint
 from tpRigToolkit.tools.rigbuilder.widgets import scriptstree
 
 
@@ -31,7 +30,7 @@ class BlueprintsEditor(tool.DockTool, object):
 
     NAME = 'Blueprints Editor'
     TOOLTIP = 'Manages current available blueprints'
-    DEFAULT_DOCK_AREA = Qt.LeftDockWidgetArea
+    DEFAULT_DOCK_AREA = Qt.RightDockWidgetArea
     IS_SINGLETON = True
 
     def __init__(self):
@@ -48,31 +47,33 @@ class BlueprintsEditor(tool.DockTool, object):
     def show_tool(self):
         super(BlueprintsEditor, self).show_tool()
 
+        data_library = self._app.data_library()
+
         if not self._created:
             self._create_ui()
+            self._created = True
 
-    def close_tool(self):
-        super(BlueprintsEditor, self).close_tool()
-
-    def get_blueprints_path(self):
-        """
-        Returns default path where blueprints are located
-        :return: str
-        """
-
-        from tpRigToolkit.tools.rigbuilder import blueprints
-
-        return os.path.dirname(os.path.abspath(blueprints.__file__))
+        if data_library:
+            self._blueprints_viewer.set_library(data_library)
 
     def _create_ui(self):
         settings = self._app.settings()
         project = self._app.get_project()
         console = self._app.get_console()
 
+        self._toolbar = QToolBar()
+        self._content_layout.addWidget(self._toolbar)
+
+        self._build_btn = QToolButton()
+        self._build_btn.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        self._build_btn.setIcon(resource.ResourceManager().icon('play'))
+        self._build_btn.setText('Build')
+        self._toolbar.addWidget(self._build_btn)
+
         self._stack = stack.SlidingStackedWidget()
         self._content_layout.addWidget(self._stack)
 
-        self._blueprints_viewer = BlueprintsViewer(project, settings, self.get_blueprints_path())
+        self._blueprints_viewer = BlueprintsViewer(project, settings)
 
         self._stack.addWidget(self._blueprints_viewer)
 
@@ -86,11 +87,11 @@ class BlueprintsViewer(base.BaseWidget, object):
 
     blueprintCreated = Signal(str)
 
-    def __init__(self, project, settings, blueprints_path, parent=None):
+    def __init__(self, project, settings, parent=None):
 
+        self._library = None
         self._project = project
         self._settings = settings
-        self._blueprints_path = blueprints_path
 
         super(BlueprintsViewer, self).__init__(parent=parent)
 
@@ -101,7 +102,7 @@ class BlueprintsViewer(base.BaseWidget, object):
         main_splitter.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         self.main_layout.addWidget(main_splitter)
 
-        self._blueprints_tree = BlueprintsTree(blueprints_path=self._blueprints_path, project=self._project)
+        self._blueprints_tree = BlueprintsTree(project=self._project)
 
         right_splitter = QSplitter(Qt.Vertical)
         main_splitter.addWidget(self._blueprints_tree)
@@ -115,6 +116,22 @@ class BlueprintsViewer(base.BaseWidget, object):
     def setup_signals(self):
         self._blueprints_tree.currentItemChanged.connect(self._on_blueprint_selected)
         self._blueprints_tree.blueprintCreated.connect(self.blueprintCreated.emit)
+
+    def library(self):
+        """
+        Returns library attached to this widget
+        :return:
+        """
+
+        return self._library
+
+    def set_library(self, library):
+        """
+        Sets library attached to this widget
+        :param library:
+        """
+
+        self._library = library
 
     def refresh(self):
         """
@@ -130,11 +147,14 @@ class BlueprintsViewer(base.BaseWidget, object):
         :param previous:
         :return:
         """
+
         if not hasattr(current, 'item_type') or not current.item_type == consts.DataTypes.Blueprint:
             self._blueprints_scripts.set_object(None)
             self._blueprints_scripts.set_directory('')
             self._blueprints_scripts_options.set_option_object(None)
             self._blueprints_scripts_options.clear_options()
+            if self._library:
+                self._library.set_path(None)
             return
 
         blueprint_selected = current.data(0, Qt.UserRole)
@@ -146,16 +166,19 @@ class BlueprintsViewer(base.BaseWidget, object):
         self._blueprints_scripts_options.set_option_object(blueprint_selected)
         self._blueprints_scripts_options.update_options()
 
+        if self._library:
+            self._library.set_path(blueprint_selected.get_path())
+            blueprint_selected.set_library(self._library)
+
 
 class BlueprintsTree(QTreeWidget, object):
 
     blueprintCreated = Signal(str)
 
-    def __init__(self, project, blueprints_path, parent=None):
+    def __init__(self, project, parent=None):
         super(BlueprintsTree, self).__init__(parent)
 
         self._project = project
-        self._blueprints_path = blueprints_path
 
         self.setAlternatingRowColors(True)
         self.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -171,7 +194,7 @@ class BlueprintsTree(QTreeWidget, object):
 
         builder_item = QTreeWidgetItem()
         builder_item.setText(0, 'RigBuilder')
-        builder_item.setData(0, Qt.UserRole, self._blueprints_path)
+        builder_item.setData(0, Qt.UserRole, helpers.BlueprintsHelpers.get_rigbuilder_blueprints_path())
         builder_item.item_type = 'root'
         project_item = QTreeWidgetItem()
         project_item.setText(0, 'Project: {}'.format(self._project.get_name()))
@@ -181,7 +204,7 @@ class BlueprintsTree(QTreeWidget, object):
         self.addTopLevelItem(builder_item)
         self.addTopLevelItem(project_item)
 
-        blueprints_found = self._search_blueprints()
+        blueprints_found = helpers.BlueprintsHelpers.find_blueprints(project=self._project)
         if not blueprints_found:
             return
 
@@ -192,61 +215,12 @@ class BlueprintsTree(QTreeWidget, object):
             blueprint_item.item_type = consts.DataTypes.Blueprint
             blueprint_item.setData(0, Qt.UserRole, blueprint_found)
             blueprint_path = blueprint_found.get_path()
-            if blueprint_path.startswith(self._blueprints_path):
+            if blueprint_path.startswith(helpers.BlueprintsHelpers.get_rigbuilder_blueprints_path()):
                 builder_item.addChild(blueprint_item)
             elif blueprint_path.startswith(project_path):
                 project_item.addChild(blueprint_item)
 
         self.expandAll()
-
-    def _get_paths_to_find(self):
-        """
-        Internal function that returns all paths where blueprints will be search
-        :return: list(str)
-        """
-
-        return [self._blueprints_path, self._project.get_full_path()]
-
-    def _search_blueprints(self):
-        """
-        Internal function that searches blueprints in folders
-        :return: list(str)
-        """
-
-        paths_to_find = self._get_paths_to_find()
-        if not paths_to_find:
-            return
-
-        blueprints_found = list()
-        for path_to_find in paths_to_find:
-            blueprints_path = path_utils.clean_path(os.path.join(path_to_find, blueprint.Blueprint.BLUEPRINTS_FOLDER))
-            if not os.path.isdir(blueprints_path):
-                continue
-            for blueprint_folder in os.listdir(blueprints_path):
-                blueprint_path = path_utils.clean_path(os.path.join(blueprints_path, blueprint_folder))
-                for root, _, filenames in os.walk(blueprint_path):
-                    data_file_name = '{}.{}'.format(
-                        blueprint.Blueprint.DATA_FILE_NAME, blueprint.Blueprint.DATA_FILE_NAME_EXTENSION)
-                    if data_file_name in filenames:
-                        for filename in filenames:
-                            if filename.startswith(data_file_name):
-                                data_file_path = path_utils.clean_path(os.path.join(root, filename))
-                                try:
-                                    data_dict = yamlio.read_file(data_file_path)
-                                    if not data_dict:
-                                        continue
-                                    data_type = data_dict.get('data_type', None)
-                                    if not data_type:
-                                        continue
-                                    if data_type == consts.DataTypes.Blueprint:
-                                        blueprint_name = os.path.basename(os.path.dirname(data_file_path))
-                                        new_blueprint = blueprint.Blueprint(blueprint_name)
-                                        new_blueprint.set_directory(path_to_find)
-                                        blueprints_found.append(new_blueprint)
-                                except Exception as exc:
-                                    continue
-
-        return blueprints_found
 
     def _on_custom_context_menu(self, pos):
         item = self.itemAt(pos)
@@ -260,6 +234,10 @@ class BlueprintsTree(QTreeWidget, object):
             create_icon = resource.ResourceManager().icon('import')
             create_blueprint_action = context_menu.addAction(create_icon, 'New Blueprint')
             create_blueprint_action.triggered.connect(partial(self._on_create_blueprint, item.data(0, Qt.UserRole)))
+        elif item_type == consts.DataTypes.Blueprint:
+            play_icon = resource.ResourceManager().icon('play')
+            build_blueprint_action = context_menu.addAction(play_icon, 'Build Blueprint')
+            build_blueprint_action.triggered.connect(partial(self._on_build_blueprint, item.data(0, Qt.UserRole)))
 
         context_menu.exec_(self.mapToGlobal(pos))
 
@@ -275,6 +253,12 @@ class BlueprintsTree(QTreeWidget, object):
             return
 
         self.blueprintCreated.emit(blueprint_path)
+
+    def _on_build_blueprint(self, blueprint_to_build):
+        if not blueprint_to_build:
+            return
+
+        blueprint_to_build.build()
 
 
 class BlueprintScriptItem(scriptstree.ScriptItem, object):

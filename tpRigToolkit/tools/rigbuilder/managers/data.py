@@ -16,7 +16,7 @@ from tpPyUtils import path, decorators
 from tpQtLib.widgets.library import manager
 
 from tpRigToolkit.tools.rigbuilder import register
-from tpRigToolkit.tools.rigbuilder.core import data
+from tpRigToolkit.tools.rigbuilder.core import data, utils
 
 LOGGER = logging.getLogger('tpRigToolkit')
 
@@ -25,7 +25,7 @@ class DataManager(manager.LibraryManager, object):
     def __init__(self, settings=None, update_on_init=True):
         super(DataManager, self).__init__(settings=settings)
 
-        self._directories = list()
+        self._directories = utils.get_data_files_directory()
 
         if update_on_init:
             self.update_data_classes()
@@ -85,7 +85,6 @@ class DataManager(manager.LibraryManager, object):
 
         for loader, mod_name, is_package in pkgutil.walk_packages([directory]):
             try:
-                print('Module Name: {}'.format(mod_name))
                 module = loader.find_module(mod_name).load_module(mod_name)
                 if do_reload:
                     reload(module)
@@ -98,7 +97,7 @@ class DataManager(manager.LibraryManager, object):
                 LOGGER.error(traceback.format_exc())
 
         for data_cls in data_classes:
-            print('Data Class: {}'.format(data_cls))
+            LOGGER.info('Found Data Class: {}'.format(data_cls))
 
         return sorted(list(set(data_classes)))
 

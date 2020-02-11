@@ -10,7 +10,8 @@ from __future__ import print_function, division, absolute_import
 from tpQtLib.widgets.library import window
 
 from tpRigToolkit.tools import rigbuilder
-from tpRigToolkit.tools.rigbuilder.core import datalibrary
+from tpRigToolkit.tools.rigbuilder.core import utils, datalibrary
+from tpRigToolkit.tools.rigbuilder.objects import helpers
 
 
 class DataLibraryWindow(window.LibraryWindow):
@@ -23,7 +24,7 @@ class DataLibraryWindow(window.LibraryWindow):
         self._console = console
 
         # Settings used by the library
-        library_settings = rigbuilder.get_library_settings()
+        library_settings = utils.get_library_settings()
 
         super(DataLibraryWindow, self).__init__(
             name='DataLibraryWindow',
@@ -56,11 +57,11 @@ class DataLibraryWindow(window.LibraryWindow):
             return
 
         rig_path = self.path()
-        is_rig = helpers.is_rig(rig_path)
+        is_rig = helpers.RigHelpers().is_rig(rig_path)
         if not is_rig:
             return
 
-        current_rig = helpers.get_rig(rig_path)
+        current_rig = helpers.RigHelpers().get_rig(rig_path)
         current_rig.set_library(self.library())
         rig_data_path = current_rig.get_data_path()
 

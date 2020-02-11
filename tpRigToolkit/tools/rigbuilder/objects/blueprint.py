@@ -32,7 +32,10 @@ class Blueprint(script.ScriptObject, object):
     def __init__(self, name):
         super(Blueprint, self).__init__(name=name)
 
-    # OVERRIDES
+    # ================================================================================================
+    # ======================== OVERRIDES
+    # ================================================================================================
+
     def _create_folder(self):
         """
         Overrides base BuildObject _create_folder function
@@ -57,7 +60,10 @@ class Blueprint(script.ScriptObject, object):
 
         return blueprint_path
 
-    # BASE
+    # ================================================================================================
+    # ======================== BASE
+    # ================================================================================================
+
     def get_path(self):
         """
         Overrides base BuildObject get_path function
@@ -89,6 +95,19 @@ class Blueprint(script.ScriptObject, object):
         options_path = path_utils.clean_path(os.path.join(self.get_path(), self.OPTIONS_FILE_NAME))
 
         return options_path
+
+    def build(self, start_new=False):
+        """
+        Builds current blueprint
+        """
+
+        valid_run = self.run(start_new=start_new)
+
+        return valid_run
+
+    # ================================================================================================
+    # ======================== INTERNAL
+    # ================================================================================================
 
     def _create_data_file(self):
         """

@@ -18,10 +18,9 @@ import logging
 import __builtin__      # Not remove because its used to clean rig script builtins
 
 import tpDccLib as tp
-from tpPyUtils import osplatform, folder, fileio, version, path as path_utils
+from tpPyUtils import osplatform, folder, fileio, yamlio, jsonio, version, path as path_utils
 
-from tpRigToolkit.tools import rigbuilder
-from tpRigToolkit.tools.rigbuilder.core import consts
+from tpRigToolkit.tools.rigbuilder.core import consts, utils
 
 LOGGER = logging.getLogger('tpRigToolkit')
 
@@ -148,14 +147,14 @@ class ObjectsHelpers(object):
 class ScriptHelpers(ObjectsHelpers, object):
 
     @staticmethod
-    def get_code_builtins(script_object):
+    def get_code_builtins(build_object):
         """
         Returns all current code builtins of the given script object
-        :param script_object: ScriptObject
+        :param build_object: BuildObject
         :return: dict
         """
 
-        builtins = {'script_object': script_object, 'show': show, 'warning': warning}
+        builtins = {'build': build_object, 'show': ObjectsHelpers.show, 'warning': ObjectsHelpers.warning}
         if tp.is_maya():
             import maya.cmds as cmds
             import pymel.all as pymel
@@ -457,7 +456,7 @@ class RigHelpers(ScriptHelpers, object):
             data_folder_path = target_rig.create_data(data_name, data_type, sub_folder)
 
         data_path = source_rig.get_data_path()
-        data_folder = data.ScriptFolder(data_name, data_path, data_path=rigbuilder.get_data_files_directory())
+        data_folder = data.ScriptFolder(data_name, data_path, data_path=utils.get_data_files_directory())
         data_inst = data_folder.get_folder_data_instance()
         if not data_inst:
             return
@@ -518,7 +517,7 @@ class RigHelpers(ScriptHelpers, object):
             code_folder_path = target_rig.create_code(code_name, scripts.ScriptTypes.Python)
 
         code_path = source_rig.get_code_path()
-        data_folder = data.ScriptFolder(code_name, code_path, data_path=rigbuilder.get_data_files_directory())
+        data_folder = data.ScriptFolder(code_name, code_path, data_path=utils.get_data_files_directory())
         data_inst = data_folder.get_folder_data_instance()
         if not data_inst:
             return
@@ -529,7 +528,7 @@ class RigHelpers(ScriptHelpers, object):
         if file_path:
             target_dir = code_folder_path
             target_path = target_rig.get_code_path()
-            data.ScriptFolder(code_name, target_path, data_path=rigbuilder.get_data_files_directory())
+            data.ScriptFolder(code_name, target_path, data_path=utils.get_data_files_directory())
             if path_utils.is_file(file_path):
                 copied_path = fileio.copy_file(file_path, target_dir)
             elif path_utils.is_dir(file_path):
@@ -568,3 +567,76 @@ class RigHelpers(ScriptHelpers, object):
         source_path = source_rig.get_path()
 
         LOGGER.info('Finished copying settings from {}'.format(source_path))
+
+
+class BlueprintsHelpers(ObjectsHelpers, object):
+
+    @staticmethod
+    def get_blueprints_paths(project=None):
+        """
+        Returns all paths where blueprints can be located
+        :param project: Proejct
+        :return: list(str)
+        """
+
+        blueprints_paths = [BlueprintsHelpers.get_rigbuilder_blueprints_path()]
+        if project:
+            blueprints_paths.append(project.get_full_path())
+
+        return blueprints_paths
+
+    @staticmethod
+    def get_rigbuilder_blueprints_path():
+        """
+        Returns path where rigbuilder generic blueprints are loated
+        :return: str
+        """
+
+        from tpRigToolkit.tools.rigbuilder import blueprints
+
+        return os.path.dirname(os.path.abspath(blueprints.__file__))
+
+    @staticmethod
+    def find_blueprints(project=None):
+        """
+        Returns all blueprints located in project and rigbuilder blueprints paths
+        :param project: Project
+        :return: list(str)
+        """
+
+        from tpRigToolkit.tools.rigbuilder.objects import blueprint
+
+        paths_to_find = BlueprintsHelpers.get_blueprints_paths(project=project)
+        if not paths_to_find:
+            return
+
+        blueprints_found = list()
+        for path_to_find in paths_to_find:
+            blueprints_path = path_utils.clean_path(os.path.join(path_to_find, blueprint.Blueprint.BLUEPRINTS_FOLDER))
+            if not os.path.isdir(blueprints_path):
+                continue
+            for blueprint_folder in os.listdir(blueprints_path):
+                blueprint_path = path_utils.clean_path(os.path.join(blueprints_path, blueprint_folder))
+                for root, _, filenames in os.walk(blueprint_path):
+                    data_file_name = '{}.{}'.format(
+                        blueprint.Blueprint.DATA_FILE_NAME, blueprint.Blueprint.DATA_FILE_NAME_EXTENSION)
+                    if data_file_name in filenames:
+                        for filename in filenames:
+                            if filename.startswith(data_file_name):
+                                data_file_path = path_utils.clean_path(os.path.join(root, filename))
+                                try:
+                                    data_dict = yamlio.read_file(data_file_path)
+                                    if not data_dict:
+                                        continue
+                                    data_type = data_dict.get('data_type', None)
+                                    if not data_type:
+                                        continue
+                                    if data_type == consts.DataTypes.Blueprint:
+                                        blueprint_name = os.path.basename(os.path.dirname(data_file_path))
+                                        new_blueprint = blueprint.Blueprint(blueprint_name)
+                                        new_blueprint.set_directory(path_to_find)
+                                        blueprints_found.append(new_blueprint)
+                                except Exception as exc:
+                                    continue
+
+        return blueprints_found

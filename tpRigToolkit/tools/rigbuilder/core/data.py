@@ -20,7 +20,7 @@ from tpQtLib.widgets.library import manager
 from tpQtLib.widgets.library import items, loadwidget
 
 from tpRigToolkit.tools import rigbuilder
-
+from tpRigToolkit.tools.rigbuilder.core import utils
 
 class ScriptFolder(manager.LibraryDataFolder, object):
     def __init__(self, name, file_path, data_path=None):
@@ -127,7 +127,7 @@ class DataItem(items.BaseItem, object):
         :return: JSONSettings
         """
 
-        return tpRigBuilder.get_library_settings()
+        return utils.get_library_settings()
 
     def load(self, objects=None, namespaces=None, **kwargs):
         """
@@ -209,7 +209,7 @@ class DataItem(items.BaseItem, object):
 
         if hasattr(class_name, 'get_data_extension()'):
             if class_name.Extension != '.{}'.format(class_name.get_data_extension()):
-                tpRigBuilder.logger.error('Data class {} (.{}) has not the same extension as the data item: {} ({})'.format(class_name, class_name.get_data_extension(), self, self.Extension))
+                LOGGER.error('Data class {} (.{}) has not the same extension as the data item: {} ({})'.format(class_name, class_name.get_data_extension(), self, self.Extension))
                 return
 
         self._data_class = class_name
