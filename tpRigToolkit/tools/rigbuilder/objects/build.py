@@ -202,7 +202,7 @@ class BuildObject(object):
     # ======================== CREATE / LOAD
     # ================================================================================================
 
-    def load(self):
+    def load(self, *args, **kwargs):
         """
         Loads the given build object into the instance
         """

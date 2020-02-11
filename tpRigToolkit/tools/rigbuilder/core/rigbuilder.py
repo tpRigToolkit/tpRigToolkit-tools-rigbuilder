@@ -12,6 +12,8 @@ __license__ = "MIT"
 __maintainer__ = "Tomas Poveda"
 __email__ = "tpovedatd@gmail.com"
 
+import os
+
 from Qt.QtCore import *
 from Qt.QtWidgets import *
 
@@ -20,6 +22,7 @@ from functools import partial
 
 from tpQtLib.core import tool, qtutils
 from tpQtLib.widgets import stack, splitters
+from tpPyUtils import path as path_utils
 
 import tpRigToolkit
 from tpRigToolkit.core import resource
@@ -42,6 +45,11 @@ class RigBuilderTool(tpRigToolkit.Tool, object):
         self._progress_toolbar = None
 
         super(RigBuilderTool, self).__init__(config=config)
+
+        # Force initialization of managers
+        rigbuilder.PkgsMgr().register_package_path(
+            path_utils.clean_path(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'packages')))
+
 
     def post_attacher_set(self):
         """
