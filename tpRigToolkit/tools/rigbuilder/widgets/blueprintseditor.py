@@ -14,11 +14,13 @@ from functools import partial
 from Qt.QtCore import *
 from Qt.QtWidgets import *
 
-from tpQtLib.core import base, tool
+from tpQtLib.core import base
 from tpQtLib.widgets import stack, options
 
 from tpRigToolkit.core import resource
+from tpRigToolkit.tools import rigbuilder
 from tpRigToolkit.tools.rigbuilder.core import consts, utils
+from tpRigToolkit.tools.rigbuilder.items import script
 from tpRigToolkit.tools.rigbuilder.objects import helpers, blueprint
 from tpRigToolkit.tools.rigbuilder.widgets import scriptstree
 
@@ -26,43 +28,19 @@ from tpRigToolkit.tools.rigbuilder.widgets import scriptstree
 LOGGER = logging.getLogger('tpRigToolkit')
 
 
-class BlueprintsEditor(tool.DockTool, object):
+class BlueprintsEditor(base.BaseWidget, object):
+    def __init__(self, project, settings):
 
-    NAME = 'Blueprints Editor'
-    TOOLTIP = 'Manages current available blueprints'
-    DEFAULT_DOCK_AREA = Qt.RightDockWidgetArea
-    IS_SINGLETON = True
+        self._project = project
+        self._settings = settings
 
-    def __init__(self):
         super(BlueprintsEditor, self).__init__()
 
-        self._created = False
-        self._content = QWidget()
-        self._content_layout = QVBoxLayout()
-        self._content_layout.setContentsMargins(0, 0, 0, 0)
-        self._content_layout.setSpacing(0)
-        self._content.setLayout(self._content_layout)
-        self.setWidget(self._content)
-
-    def show_tool(self):
-        super(BlueprintsEditor, self).show_tool()
-
-        data_library = self._app.data_library()
-
-        if not self._created:
-            self._create_ui()
-            self._created = True
-
-        if data_library:
-            self._blueprints_viewer.set_library(data_library)
-
-    def _create_ui(self):
-        settings = self._app.settings()
-        project = self._app.get_project()
-        console = self._app.get_console()
+    def ui(self):
+        super(BlueprintsEditor, self).ui()
 
         self._toolbar = QToolBar()
-        self._content_layout.addWidget(self._toolbar)
+        self.main_layout.addWidget(self._toolbar)
 
         self._build_btn = QToolButton()
         self._build_btn.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
@@ -71,15 +49,28 @@ class BlueprintsEditor(tool.DockTool, object):
         self._toolbar.addWidget(self._build_btn)
 
         self._stack = stack.SlidingStackedWidget()
-        self._content_layout.addWidget(self._stack)
+        self.main_layout.addWidget(self._stack)
 
-        self._blueprints_viewer = BlueprintsViewer(project, settings)
+        self._blueprints_viewer = BlueprintsViewer(self._project, self._settings)
 
         self._stack.addWidget(self._blueprints_viewer)
 
+    def setup_signals(self):
         self._blueprints_viewer.blueprintCreated.connect(self._on_blueprint_created)
 
+    def set_project(self, project):
+        self._blueprints_viewer.set_project(project)
+
+    def set_library(self, library):
+        self._library = library
+        self._blueprints_viewer.set_library(library)
+
     def _on_blueprint_created(self):
+
+        # NOTE: We must update data classes. Otherwise we have problems when
+        # instancing custom data classes in data library
+        rigbuilder.DataMgr().update_data_classes()
+
         self._blueprints_viewer.refresh()
 
 
@@ -117,6 +108,10 @@ class BlueprintsViewer(base.BaseWidget, object):
         self._blueprints_tree.currentItemChanged.connect(self._on_blueprint_selected)
         self._blueprints_tree.blueprintCreated.connect(self.blueprintCreated.emit)
 
+    def set_project(self, project):
+        self._project = project
+        self._blueprints_tree.set_project(project)
+
     def library(self):
         """
         Returns library attached to this widget
@@ -149,26 +144,31 @@ class BlueprintsViewer(base.BaseWidget, object):
         """
 
         if not hasattr(current, 'item_type') or not current.item_type == consts.DataTypes.Blueprint:
+            if self._library:
+                if self._project:
+                    self._library.set_path(self._project.get_full_path())
+                else:
+                    self._library.set_path(None)
+            self._library.setEnabled(False)
             self._blueprints_scripts.set_object(None)
             self._blueprints_scripts.set_directory('')
             self._blueprints_scripts_options.set_option_object(None)
             self._blueprints_scripts_options.clear_options()
-            if self._library:
-                self._library.set_path(None)
             return
 
         blueprint_selected = current.data(0, Qt.UserRole)
         if not blueprint_selected:
             return
 
+        if self._library:
+            blueprint_selected.set_library(self._library)
+            self._library.set_path(blueprint_selected.get_path())
+            self._library.setEnabled(True)
+
         self._blueprints_scripts.set_object(blueprint_selected)
         self._blueprints_scripts.set_directory(blueprint_selected.get_path())
         self._blueprints_scripts_options.set_option_object(blueprint_selected)
         self._blueprints_scripts_options.update_options()
-
-        if self._library:
-            self._library.set_path(blueprint_selected.get_path())
-            blueprint_selected.set_library(self._library)
 
 
 class BlueprintsTree(QTreeWidget, object):
@@ -187,8 +187,15 @@ class BlueprintsTree(QTreeWidget, object):
 
         self.customContextMenuRequested.connect(self._on_custom_context_menu)
 
+    def set_project(self, project):
+        self._project = project
+        self.refresh()
+
     def refresh(self):
         self.clear()
+
+        if not self._project:
+            return
 
         project_path = self._project.get_full_path()
 
@@ -261,7 +268,7 @@ class BlueprintsTree(QTreeWidget, object):
         blueprint_to_build.build()
 
 
-class BlueprintScriptItem(scriptstree.ScriptItem, object):
+class BlueprintScriptItem(script.ScriptItem, object):
     def __init__(self, parent=None):
         super(BlueprintScriptItem, self).__init__(parent=parent)
 
