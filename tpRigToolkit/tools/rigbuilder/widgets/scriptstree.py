@@ -7,7 +7,6 @@ Module that contains widget to show scripts tree
 
 from __future__ import print_function, division, absolute_import
 
-import os
 import logging
 
 from Qt.QtCore import *
@@ -21,178 +20,16 @@ from tpQtLib.core import qtutils
 
 from tpRigToolkit.core import resource
 from tpRigToolkit.tools.rigbuilder.core import utils
+from tpRigToolkit.tools.rigbuilder.items import script
 from tpRigToolkit.tools.rigbuilder.widgets import basetree
 
 LOGGER = logging.getLogger('tpRigToolkit')
 
 
-class ScriptItemSignals(QObject, object):
-
-    createPythonCode = Signal()
-    createData = Signal()
-    runCode = Signal()
-    renameCode = Signal()
-    duplicateCode = Signal()
-    deleteCode = Signal()
-    browseCode = Signal()
-
-
-class ScriptItem(basetree.BaseItem, object):
-
-    scriptSignals = ScriptItemSignals()
-
-    def __init__(self, parent=None):
-
-        self.handle_manifest = False
-
-        super(ScriptItem, self).__init__(parent)
-
-    # ================================================================================================
-    # ======================== OVERRIDES
-    # ================================================================================================
-
-    def setData(self, column, role, value):
-        """
-        Overrides base QTreeWidgetItem setData function
-        :param column: int
-        :param role: QRole
-        :param value: variant
-        """
-
-        super(ScriptItem, self).setData(column, role, value)
-
-        if value == 0:
-            check_state = Qt.Unchecked
-        elif value == 2:
-            check_state = Qt.Checked
-
-        if role == Qt.CheckStateRole:
-            if self.handle_manifest:
-                tree = self.treeWidget()
-                tree.update_scripts_manifest()
-                if tree._shift_activate:
-                    child_count = self.childCount()
-                    for i in range(child_count):
-                        child = self.child(i)
-                        child.setCheckedState(column, check_state)
-                        children = tree._get_ancestors(child)
-                        for child in children:
-                            child.setCheckedState(column, check_state)
-
-    def _create_context_menu(self):
-        """
-        Overrides base BuildItem create_context_menu function
-        Creates context menu for this item
-        :return: QMenu
-        """
-
-        self._context_menu = QMenu()
-
-        python_icon = resource.ResourceManager().icon('python')
-        import_icon = resource.ResourceManager().icon('import')
-        play_icon = resource.ResourceManager().icon('play')
-        rename_icon = resource.ResourceManager().icon('rename')
-        duplicate_icon = resource.ResourceManager().icon('clone')
-        delete_icon = resource.ResourceManager().icon('delete')
-        browse_icon = resource.ResourceManager().icon('open')
-        external_icon = resource.ResourceManager().icon('external')
-        new_window_icon = resource.ResourceManager().icon('new_window')
-
-        new_python_action = self._context_menu.addAction(python_icon, 'New Python Code')
-        new_data_import_action = self._context_menu.addAction(import_icon, 'New Data Import')
-        self._context_menu.addSeparator()
-        run_action = self._context_menu.addAction(play_icon, 'Run')
-        rename_action = self._context_menu.addAction(rename_icon, 'Rename')
-        duplicate_action = self._context_menu.addAction(duplicate_icon, 'Duplicate')
-        delete_action = self._context_menu.addAction(delete_icon, 'Delete')
-        self._context_menu.addSeparator()
-        browse_action = self._context_menu.addAction(browse_icon, 'Browse')
-        external_window_action = self._context_menu.addAction(external_icon, 'Open in External')
-        new_window_action = self._context_menu.addAction(new_window_icon, 'Open in New Window')
-
-        new_python_action.triggered.connect(self.scriptSignals.createPythonCode.emit)
-        run_action.triggered.connect(self.scriptSignals.runCode.emit)
-        rename_action.triggered.connect(self.scriptSignals.renameCode.emit)
-        duplicate_action.triggered.connect(self.scriptSignals.duplicateCode.emit)
-        delete_action.triggered.connect(self.scriptSignals.deleteCode.emit)
-        browse_action.triggered.connect(self.scriptSignals.browseCode.emit)
-        external_window_action.triggered.connect(self._on_open_in_external)
-        new_window_action.triggered.connect(self._on_open_in_window)
-
-    # ================================================================================================
-    # ======================== BASE
-    # ================================================================================================
-
-    def get_code_name(self, remove_extension=False):
-        """
-        Returns item code path
-        :return: str
-        """
-
-        script_name = path_utils.get_basename(self.get_text(), with_extension=False)
-        script_path = self.get_path()
-        if script_path:
-            script_name = path_utils.join_path(script_path, script_name)
-
-        if remove_extension:
-            return fileio.remove_extension(script_name)
-
-        return script_name
-
-    # ================================================================================================
-    # ======================== CALLBACKS
-    # ================================================================================================
-
-    def _on_open_in_external(self):
-        """
-        Internal callback function that opens script in external editor
-        :param item: ScripItem
-        :return:
-        """
-
-        current_object = self.get_object()
-        if not current_object:
-            LOGGER.warning('Impossible to open script because object is not defined!')
-            return
-
-        code_name = self.get_code_name(remove_extension=True)
-        code_file = current_object.get_code_file(code_name)
-        if not code_file or not os.path.isfile(code_file):
-            LOGGER.warning('Impossible to open script "{}" because it does not exists!'.format(code_file))
-            return
-
-        # TODO: Add support for custom external editors
-        # external_editor = self._settings.get('external_directory')
-        # if external_editor:
-        #     p = subprocess.Popen([external_editor, code_file])
-
-        fileio.open_browser(code_file)
-
-    def _on_open_in_window(self, item=None):
-        """
-        Internal callback function that opens script in script editor
-        :param item: ScripItem
-        :return:
-        """
-
-        current_object = self.get_object()
-        if not current_object:
-            LOGGER.warning('Impossible to open script because object is not defined!')
-            return
-
-        code_name = self.get_code_name(remove_extension=True)
-        code_file = current_object.get_code_file(code_name)
-        if not code_file or not os.path.isfile(code_file):
-            LOGGER.warning('Impossible to open script "{}" because it does not exists!'.format(code_file))
-            return
-
-        raise NotImplementedError('open in new window functionality is not implemented yet!')
-
-
 class ScriptTree(basetree.BaseTree, object):
 
     HEADER_LABELS = ['Scripts']
-    ITEM_WIDGET = ScriptItem
+    ITEM_WIDGET = script.ScriptItem
     NEW_ITEM_NAME = 'new_script'
 
     itemSignalsConnected = False
@@ -294,15 +131,6 @@ class ScriptTree(basetree.BaseTree, object):
             if item:
                 self.set_break_point(item)
 
-    def _get_invalid_code_names(self):
-        """
-        Overrides base BuildTree _get_invalid_code_names function
-        Internal function that returns a list not valid code names
-        :return: list(str)
-        """
-
-        return ['manifest', 'manifest.py']
-
     def _add_item(self, file_name, state, parent=None, **kwargs):
         """
         Overrides base BuildTree _add_item function
@@ -352,6 +180,8 @@ class ScriptTree(basetree.BaseTree, object):
 
             if not states[i]:
                 found_false = True
+
+            self._post_setup_item(item, states[i])
 
         orig_update_checkbox = self._update_checkbox
         self._update_checkbox = False
@@ -420,7 +250,7 @@ class ScriptTree(basetree.BaseTree, object):
 
         super(ScriptTree, self)._setup_item(item=item, state=state)
 
-        if not self.itemSignalsConnected:
+        if not self.itemSignalsConnected and hasattr(item, 'scriptSignals'):
             item.scriptSignals.createPythonCode.connect(self._on_create_python_code)
             item.scriptSignals.runCode.connect(self._on_run_current_item)
             item.scriptSignals.renameCode.connect(self._on_rename_current_item)
