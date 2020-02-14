@@ -14,6 +14,7 @@ FOLDERS_SUFFIX = '__'
 BLUEPRINTS_FOLDER = '__blueprints__'
 CODE_FOLDER = '__code__'
 DATA_FOLDER = '__data___'
+NODE_FOLDER = '__node__'
 BACKUP_FOLDER = '__backup__'
 VERSIONS_FOLDER = '__versions__'
 MANIFEST_FOLDER = 'manifest'
@@ -34,4 +35,5 @@ class DataTypes(object):
     Unknown = scripts.ScriptTypes.Unknown
     Python = scripts.ScriptTypes.Python
     Manifest = scripts.ScriptTypes.Manifest
+    Node = 'script.node'
     Blueprint = 'Blueprint'
