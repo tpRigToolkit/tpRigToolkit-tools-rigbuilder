@@ -22,6 +22,7 @@ from tpQtLib.widgets.library import items, loadwidget
 from tpRigToolkit.tools import rigbuilder
 from tpRigToolkit.tools.rigbuilder.core import utils
 
+
 class ScriptFolder(manager.LibraryDataFolder, object):
     def __init__(self, name, file_path, data_path=None):
         super(ScriptFolder, self).__init__(name=name, file_path=file_path, data_path=data_path)

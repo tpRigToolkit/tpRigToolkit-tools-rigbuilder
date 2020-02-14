@@ -60,7 +60,7 @@ class Package(object):
         Load info of the package
         """
 
-        from tpRigToolkit.tools.rigbuilder.objects import node
+        from tpRigToolkit.tools.rigbuilder.objects import build
 
         if not self._package_path or not os.path.isdir(self._package_path):
             LOGGER.warning('Package path is not valid "{}"!'.format(self._package_path))
@@ -75,7 +75,18 @@ class Package(object):
                 except Exception as exc:
                     continue
 
-                if issubclass(obj, node.BuilderNode):
+                if issubclass(obj, build.BuildObject):
                     self._builder_node_classes[obj_name] = obj
                     self._builder_node_paths[obj_name] = obj_path
-                    print('Found Builder Node: {}'.format(obj, obj_path))
+
+    def get_builder_node_class_by_name(self, class_name):
+        """
+        Returns builder node class by its name if exists
+        :param class_name: str
+        :return: BuildObject or None
+        """
+
+        if class_name not in self._builder_node_classes:
+            return None
+
+        return self._builder_node_classes[class_name]
