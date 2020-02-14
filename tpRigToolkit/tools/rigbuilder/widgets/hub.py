@@ -14,12 +14,12 @@ from Qt.QtWidgets import *
 
 import tpQtLib
 from tpQtLib.core import tool
-from tpQtLib.widgets import tabs, breadcrumb
+from tpQtLib.widgets import tabs, breadcrumb, stack, options
 from tpPyUtils import osplatform, path as path_utils
 
-from tpRigToolkit.tools.rigbuilder.widgets import builder, rigoutliner, blueprint
+from tpRigToolkit.tools.rigbuilder.widgets import builder, rigoutliner, blueprint, blueprintseditor
 from tpRigToolkit.tools.rigbuilder.objects import rig
-from tpRigToolkit.tools.rigbuilder.tools import datalibrary, controls, blueprintseditor, properties
+from tpRigToolkit.tools.rigbuilder.tools import datalibrary, controls, properties
 from tpRigToolkit.tools.rigbuilder.tools import buildnodeslibrary, blueprintslibrary
 
 LOGGER = logging.getLogger('tpRigToolkit')
@@ -35,13 +35,14 @@ class HubWidget(tpQtLib.Window, object):
         self._tools_classes = list()
 
         self._current_rig = None
+        self._current_builder_item = None
         self._path_filter = ''
         self._handle_selection_change = True
 
         # TODO: Tool registration should be automatic
         for tool_class in [
             datalibrary.DataLibrary, controls.ControlsTool, properties.PropertiesTool,
-            blueprintseditor.BlueprintsEditor, buildnodeslibrary.BuldNodesLibrary, blueprintslibrary.BlueprintsLibrary]:
+            buildnodeslibrary.BuldNodesLibrary, blueprintslibrary.BlueprintsLibrary]:
             self.register_tool_class(tool_class)
 
         super(HubWidget, self).__init__(
@@ -77,16 +78,29 @@ class HubWidget(tpQtLib.Window, object):
 
         self.setAcceptDrops(True)
 
+        self._stack = stack.SlidingStackedWidget()
+        self.main_layout.addWidget(self._stack)
+
         main_splitter = QSplitter(self)
         main_splitter.setOrientation(Qt.Horizontal)
         main_splitter.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.main_layout.addWidget(main_splitter)
 
-        self._main_tab = tabs.TearOffTabWidget()
-        self._main_tab.setTabsClosable(False)
+        self._main_tab = QTabWidget()
 
+        self._second_tab = tabs.TearOffTabWidget()
+        self._second_tab.setTabsClosable(False)
+
+        self._blueprint_editor = blueprintseditor.BlueprintsEditor(settings=self._settings, project=self._project)
         self._blueprint = blueprint.BlueprintWidget()
+
+        rig_outliner_splitter = QSplitter(self)
+        rig_outliner_splitter.setOrientation(Qt.Vertical)
+        rig_outliner_splitter.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self._outliner = rigoutliner.RigOutliner(settings=self._settings, project=self._project, console=self._console)
+        self._outliner_options = options.OptionsWidget()
+        rig_outliner_splitter.addWidget(self._outliner)
+        rig_outliner_splitter.addWidget(self._outliner_options)
+
         self._builder = builder.RigBuilder(settings=self._settings, project=self._project, console=self._console)
 
         title_widget = QFrame()
@@ -105,21 +119,33 @@ class HubWidget(tpQtLib.Window, object):
 
         tab_widget = QWidget()
         tab_layout = QVBoxLayout()
-        tab_layout.setContentsMargins(0, 0, 0, 0)
-        tab_layout.setSpacing(0)
+        tab_layout.setContentsMargins(2, 2, 2, 2)
+        tab_layout.setSpacing(2)
         tab_widget.setLayout(tab_layout)
         tab_layout.addWidget(title_widget)
-        tab_layout.addWidget(self._main_tab)
+        tab_layout.addWidget(self._second_tab)
 
-        main_splitter.addWidget(self._outliner)
+        main_splitter.addWidget(rig_outliner_splitter)
         main_splitter.addWidget(tab_widget)
 
-        self._main_tab.addTab(self._blueprint, 'Template')
-        self._main_tab.addTab(self._builder, 'Builder')
+        self._second_tab.addTab(self._builder, 'Builder')
+        self._second_tab.addTab(self._blueprint, 'Template')
         main_splitter.setSizes([1, 1])
+
+        self._main_tab.addTab(main_splitter, 'Rig')
+        self._main_tab.addTab(self._blueprint_editor, 'Blueprint')
+
+        self._builder_creator = builder.NodeBuilderCreator()
+
+        self._stack.addWidget(self._main_tab)
+        self._stack.addWidget(self._builder_creator)
 
     def setup_signals(self):
         self._outliner.tree_widget.itemSelectionChanged.connect(self._on_outliner_item_selection_changed)
+        self._builder.builder_tree().itemSelectionChanged.connect(self._on_build_tree_selection_changed)
+        self._builder.createNode.connect(self._on_create_builder_node)
+        self._builder_creator.creationCanceled.connect(self._on_cancel_builder_node_creation)
+        self._builder_creator.nodeCreated.connect(self._on_builder_node_created)
 
     # ================================================================================================
     # ======================== BASE
@@ -145,7 +171,7 @@ class HubWidget(tpQtLib.Window, object):
 
         properties_widget = self.properties_widget()
         properties_widget.set_project(project)
-
+        self._blueprint_editor.set_project(project)
         data_library = self.data_library()
         data_library.set_project(project)
 
@@ -219,6 +245,7 @@ class HubWidget(tpQtLib.Window, object):
         self._library = library
         self._outliner.set_library(library)
         self._builder.set_library(library)
+        self._blueprint_editor.set_library(library)
 
     def set_title(self, name):
         """
@@ -412,7 +439,7 @@ class HubWidget(tpQtLib.Window, object):
         else:
             self.reset_title()
 
-    def _refresh_selected_item(self):
+    def _refresh_selected_rig(self):
         """
         Internal callback function that refresh current rig item selected in rig outliner
         """
@@ -426,25 +453,56 @@ class HubWidget(tpQtLib.Window, object):
         rigs = self._outliner.tree_widget.selectedItems()
         if not rigs:
             self._update_rig(None)
-            data_library.set_path(None)
+            if self._project:
+                data_library.set_path(self._project.get_full_path())
+            else:
+                data_library.set_path(None)
             self._builder.set_rig(None)
-            properties_widget.set_object(None)
+            self._builder_creator.set_rig(None)
             self._builder.refresh()
+            self._outliner_options.clear_options()
             return
 
         item = rigs[0]
         if item.matches(self._current_rig):
             return
 
+        properties_widget.clear()
+
         rig_name = item.get_name()
         self._update_rig(rig_name)
         self._outliner.setFocus()
         data_library.set_path(self._current_rig.get_path())
         self._builder.set_rig(self._current_rig)
-        properties_widget.set_object(self._current_rig)
+        self._builder_creator.set_rig(self._current_rig)
+        self._outliner_options.set_option_object(self._current_rig)
+        self._outliner_options.update_options()
 
         self._builder.refresh()
-        properties_widget.refresh()
+
+    def _refresh_selected_builder_node(self):
+        """
+        Internal callback function that is called when a builder node is selected in the builder node tree
+        """
+
+        if not self._handle_selection_change:
+            return
+
+        properties_widget = self.properties_widget()
+
+        builder_nodes = self._builder.builder_tree().selectedItems()
+        if not builder_nodes:
+            properties_widget.clear()
+            return
+
+        item = builder_nodes[0]
+        if item.matches(self._current_builder_item):
+            return
+        item_node = item.node
+
+        properties_widget.clear()
+
+        properties_widget.assign_properties_widget(properties_fill_delegate=item_node.create_properties_widget)
 
     # ================================================================================================
     # ======================== CALLBACKS
@@ -455,4 +513,23 @@ class HubWidget(tpQtLib.Window, object):
         Internal callback function that is called when a rig is selected in the rig outliner
         """
 
-        self._refresh_selected_item()
+        self._refresh_selected_rig()
+
+    def _on_build_tree_selection_changed(self):
+        """
+        Internal callback function that is called when a builder node is selected in the builder node tree
+        """
+
+        self._refresh_selected_builder_node()
+
+    def _on_create_builder_node(self):
+        self._builder_creator.set_build_node(self._builder.current_builder_node())
+        self._stack.slide_in_index(1)
+
+    def _on_cancel_builder_node_creation(self):
+        self._stack.slide_in_index(0)
+
+    def _on_builder_node_created(self, builder_node):
+        if builder_node:
+            self._builder.create_builder_node(builder_node)
+        self._stack.slide_in_index(0)

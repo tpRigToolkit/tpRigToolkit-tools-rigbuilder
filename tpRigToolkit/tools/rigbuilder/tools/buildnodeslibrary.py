@@ -11,6 +11,8 @@ from Qt.QtWidgets import *
 
 from tpQtLib.core import tool
 
+from tpRigToolkit.tools.rigbuilder.widgets import nodestree
+
 
 class BuldNodesLibrary(tool.DockTool, object):
 
@@ -31,3 +33,7 @@ class BuldNodesLibrary(tool.DockTool, object):
 
     def show_tool(self):
         super(BuldNodesLibrary, self).show_tool()
+
+        self._nodes_tree = nodestree.BuilderNodesTree()
+        self._nodes_tree.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self._content_layout.addWidget(self._nodes_tree)

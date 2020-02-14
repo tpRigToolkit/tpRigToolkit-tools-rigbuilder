@@ -27,6 +27,7 @@ from tpPyUtils import path as path_utils
 import tpRigToolkit
 from tpRigToolkit.core import resource
 from tpRigToolkit.tools import rigbuilder
+from tpRigToolkit.tools.rigbuilder.core import utils
 from tpRigToolkit.tools.rigbuilder.widgets import project, hub, console
 
 LOGGER = logging.getLogger('tpRigToolkit')
@@ -34,6 +35,7 @@ LOGGER = logging.getLogger('tpRigToolkit')
 
 class RigBuilderTool(tpRigToolkit.Tool, object):
     def __init__(self, config, project_path=None, project_name=None):
+
 
         self._project = None
         self._project_to_open = project_name
@@ -47,9 +49,11 @@ class RigBuilderTool(tpRigToolkit.Tool, object):
         super(RigBuilderTool, self).__init__(config=config)
 
         # Force initialization of managers
+        rigbuilder.DataMgr()
         rigbuilder.PkgsMgr().register_package_path(
             path_utils.clean_path(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'packages')))
-
+        for data_file_dir in utils.get_data_files_directory():
+            rigbuilder.ScriptsMgr().add_directory(data_file_dir)
 
     def post_attacher_set(self):
         """
