@@ -12,11 +12,14 @@ __license__ = "MIT"
 __maintainer__ = "Tomas Poveda"
 __email__ = "tpovedatd@gmail.com"
 
+import os
 import string
 import logging
 
-from tpPyUtils import folder, path as path_utils
+from tpPyUtils import folder, fileio, path as path_utils
 
+from tpRigToolkit.tools.rigbuilder.core import consts, utils, data
+from tpRigToolkit.tools.rigbuilder.data import node
 from tpRigToolkit.tools.rigbuilder.objects import helpers, script
 
 LOGGER = logging.getLogger('tpRigToolkit')
@@ -25,9 +28,102 @@ LOGGER = logging.getLogger('tpRigToolkit')
 class RigObject(script.ScriptObject, object):
 
     DESCRIPTION = 'rig'
+    NODE_FOLDER = consts.NODE_FOLDER
 
     def __init__(self, name=None):
         super(RigObject, self).__init__(name=name)
+
+    # ================================================================================================
+    # ======================== OVERRIDES
+    # ================================================================================================
+
+    def _get_invalid_code_names(self):
+        invalid_folders = super(RigObject, self)._get_invalid_code_names()
+        invalid_folders.append('{}.yml'.format(self.MANIFEST_FILE))
+
+        return invalid_folders
+
+    def get_code_file(self, name, basename=False):
+        """
+        Returns path to code file with the given name in the current object code folder
+        :param name: str, name of the script we want to get
+        :param basename: bool, Whether to return full path of code file or only the code file name
+        :return: str
+        """
+
+        code_file = path_utils.join_path(self.get_code_path(), name)
+        if not path_utils.is_dir(code_file):
+            LOGGER.warning('Code File: "{}" does not exists!'.format(code_file))
+            return
+
+        code_name = path_utils.get_basename(code_file)
+        if code_name == self.MANIFEST_FILE:
+            code_name += '.{}.yml'
+        else:
+            code_name += '.yml'
+
+        if not basename:
+            code_name = path_utils.join_path(code_file, code_name)
+
+        return code_name
+
+    def sync(self):
+        scripts_list, states = self.get_scripts_manifest()
+        synced_scripts = list()
+        synced_states = list()
+
+        script_count = 0
+        if scripts_list:
+            script_count = len(scripts_list)
+        code_folders = self.get_code_folders()
+        if not script_count and not code_folders:
+            return
+
+        if script_count:
+            for i in range(script_count):
+                script_name = fileio.remove_extension(scripts_list[i])
+                script_path = self.get_code_file(script_name)
+                if not path_utils.is_file(script_path):
+                    script_path_split = os.path.splitext(script_path)
+                    script_path = '{}.yml'.format(script_path_split[0])
+                    if not path_utils.is_file(script_path):
+                        LOGGER.warning(
+                            'Script "{}" does not exists in proper path: {}'.format(script_name, script_path))
+                        continue
+                    if scripts_list[i] in synced_scripts:
+                        LOGGER.warning(
+                            'Script "{}" is already synced. Do you have scripts with duplicates names?'.format(
+                                script_name))
+                        continue
+
+                    synced_scripts.append(scripts_list[i])
+                    synced_states.append(states[i])
+
+                    remove_index = None
+                    for i in range(len(code_folders)):
+                        if code_folders[i] == script_name:
+                            remove_index = i
+                        if code_folders in synced_scripts:
+                            if not code_folders[i].count('/'):
+                                continue
+                            common_path = path_utils.get_common_path(code_folders[i], script_name)
+                            if common_path:
+                                common_path_name = common_path + '.{}'.format('yml')
+                                if common_path_name in synced_scripts:
+                                    code_script = code_folders[i] + '.{}'.format('yml')
+                                    synced_scripts.append(code_script)
+                                    synced_states.append(False)
+                                    remove_index = i
+                    if remove_index:
+                        code_folders.pop(remove_index)
+
+        for code_folder in code_folders:
+            code_folder += '.{}'.format('yml')
+            if code_folder not in synced_scripts:
+                synced_scripts.append(code_folder)
+                synced_states.append(False)
+
+        self.set_scripts_manifest(scripts_to_add=synced_scripts, states=synced_states)
 
     # ================================================================================================
     # ======================== BASE
@@ -219,3 +315,46 @@ class RigObject(script.ScriptObject, object):
             found.append(full_path)
 
         return found
+
+    # ================================================================================================
+    # ======================== NODE
+    # ================================================================================================
+
+    def create_build_node(self, builder_node, name, description=None, unique_name=True):
+        """
+        Creates a new node for current rig
+        :param builder_node:
+        :param name:
+        :param description:
+        :param unique_name:
+        :return:
+        """
+
+        code_path = self.get_code_path()
+        if not code_path:
+            return
+
+        if unique_name:
+            test_path = path_utils.join_path(code_path, name)
+            if path_utils.is_dir(test_path):
+                test_path = path_utils.unique_path_name(test_path)
+                name = path_utils.get_basename(test_path)
+
+        node_folder = data.ScriptFolder(name, code_path, data_path=utils.get_data_files_directory())
+        data_type = consts.DataTypes.Node
+        node_folder.set_data_type(data_type)
+        data_inst = node_folder.get_folder_data_instance()
+        if not data_inst:
+            LOGGER.warning('Impossible to create node of type {} because that data is not supported!'.format(data_type))
+            return
+
+        data_inst.create(builder_node)
+
+        # TODO: We should retrieve file path directly from data instance (not through data object)
+        file_name = data_inst.get_file()
+
+        if not self.is_in_manifest('{}.{}'.format(name, node.NodeData.get_data_extension())):
+            self.set_scripts_manifest(
+                ['{}.{}'.format(name, node.NodeData.get_data_extension())], append=True)
+
+        return file_name

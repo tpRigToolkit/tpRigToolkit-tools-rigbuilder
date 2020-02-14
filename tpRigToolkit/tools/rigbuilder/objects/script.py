@@ -21,7 +21,7 @@ from tpDccLib.core import scripts
 from tpPyUtils import log, osplatform, python, folder, fileio, timers, version, path as path_utils, name as name_utils
 
 from tpRigToolkit.tools.rigbuilder.core import consts, utils, data
-from tpRigToolkit.tools.rigbuilder.objects import helpers, build
+from tpRigToolkit.tools.rigbuilder.objects import helpers, base
 
 LOGGER = logging.getLogger('tpRigToolkit')
 
@@ -32,11 +32,12 @@ class ScriptStatus(object):
     SUCCESS = 'Success'
 
 
-class ScriptObject(build.BuildObject, object):
+class ScriptObject(base.BaseObject, object):
 
     CODE_FOLDER = consts.CODE_FOLDER
     MANIFEST_FILE = consts.MANIFEST_FILE
     MANIFEST_FOLDER = consts.MANIFEST_FOLDER
+    SCRIPT_EXTENSION = scripts.ScriptPythonData.get_data_extension()
     DESCRIPTION = 'script'
 
     def __init__(self, name=None):
@@ -71,6 +72,14 @@ class ScriptObject(build.BuildObject, object):
         super(ScriptObject, self)._refresh()
         self._runtime_values = dict()
 
+    def _get_invalid_code_names(self):
+        """
+        Internal function that returns a list not valid code names
+        :return: list(str)
+        """
+
+        return ['{}.{}'.format(self.MANIFEST_FILE, self.SCRIPT_EXTENSION)]
+
     def _create_folder(self):
         """
         Overrides base BuildObject _create_folder function
@@ -90,6 +99,63 @@ class ScriptObject(build.BuildObject, object):
             self.create_code(self.MANIFEST_FILE, scripts.ScriptManifestData.get_data_type())
 
         return script_path
+
+    def sync(self):
+        """
+        Syncs scripts manifest file with the scripts that are located in the code folder of the current object in disk
+        """
+
+        scripts_list, states = self.get_scripts_manifest()
+        synced_scripts = list()
+        synced_states = list()
+
+        script_count = 0
+        if scripts_list:
+            script_count = len(scripts_list)
+        code_folders = self.get_code_folders()
+        if not script_count and not code_folders:
+            return
+
+        if script_count:
+            for i in range(script_count):
+                script_name = fileio.remove_extension(scripts_list[i])
+                script_path = self.get_code_file(script_name)
+                if not path_utils.is_file(script_path):
+                    LOGGER.warning('Script "{}" does not exists in proper path: {}'.format(script_name, script_path))
+                    continue
+                if scripts_list[i] in synced_scripts:
+                    LOGGER.warning(
+                        'Script "{}" is already synced. Do you have scripts with duplicates names?'.format(script_name))
+                    continue
+
+                synced_scripts.append(scripts_list[i])
+                synced_states.append(states[i])
+
+                remove_index = None
+                for i in range(len(code_folders)):
+                    if code_folders[i] == script_name:
+                        remove_index = i
+                    if code_folders in synced_scripts:
+                        if not code_folders[i].count('/'):
+                            continue
+                        common_path = path_utils.get_common_path(code_folders[i], script_name)
+                        if common_path:
+                            common_path_name = common_path + '.{}'.format(self.SCRIPT_EXTENSION)
+                            if common_path_name in synced_scripts:
+                                code_script = code_folders[i] + '.{}'.format(self.SCRIPT_EXTENSION)
+                                synced_scripts.append(code_script)
+                                synced_states.append(False)
+                                remove_index = i
+                if remove_index:
+                    code_folders.pop(remove_index)
+
+        for code_folder in code_folders:
+            code_folder += '.{}'.format(self.SCRIPT_EXTENSION)
+            if code_folder not in synced_scripts:
+                synced_scripts.append(code_folder)
+                synced_states.append(False)
+
+        self.set_scripts_manifest(scripts_to_add=synced_scripts, states=synced_states)
 
     # ================================================================================================
     # ======================== BASE
@@ -505,7 +571,7 @@ class ScriptObject(build.BuildObject, object):
             state_count = len(states)
 
         for i in range(script_count):
-            if scripts_to_add[i] == '{}.{}'.format(self.MANIFEST_FILE, scripts.ScriptPythonData.get_data_extension()):
+            if scripts_to_add[i] in self._get_invalid_code_names():
                 continue
             if i > state_count - 1:
                 state = False
@@ -612,65 +678,6 @@ class ScriptObject(build.BuildObject, object):
         version_file = version.VersionFile(manifest_file)
 
         return version_file
-
-    def sync_scripts(self):
-        """
-        Syncs scripts manifest file with the scripts that are located in the code folder of the current object in disk
-        """
-
-        scripts_list, states = self.get_scripts_manifest()
-        synced_scripts = list()
-        synced_states = list()
-
-        script_count = 0
-        if scripts_list:
-            script_count = len(scripts_list)
-        code_folders = self.get_code_folders()
-        if not script_count and not code_folders:
-            return
-
-        if script_count:
-            for i in range(script_count):
-                script_name = fileio.remove_extension(scripts_list[i])
-                script_path = self.get_code_file(script_name)
-                if not path_utils.is_file(script_path):
-                    LOGGER.warning('Script "{}" does not exists in proper path: {}'.format(script_name, script_path))
-                    continue
-                if scripts_list[i] in synced_scripts:
-                    LOGGER.warning(
-                        'Script "{}" is already synced. Do you have scripts with duplicates names?'.format(script_name))
-                    continue
-
-                synced_scripts.append(scripts_list[i])
-                synced_states.append(states[i])
-
-                remove_index = None
-                for i in range(len(code_folders)):
-                    if code_folders[i] == script_name:
-                        remove_index = i
-                    if code_folders in synced_scripts:
-                        if not code_folders[i].count('/'):
-                            continue
-                        common_path = path_utils.get_common_path(code_folders[i], script_name)
-                        if common_path:
-                            common_path_name = common_path + '.{}'.format(scripts.ScriptPythonData.get_data_extension())
-                            if common_path_name in synced_scripts:
-                                print(code_folders[i])
-                                code_script = code_folders[i] + '.{}'.format(
-                                    scripts.ScriptPythonData.get_data_extension())
-                                synced_scripts.append(code_script)
-                                synced_states.append(False)
-                                remove_index = i
-                if remove_index:
-                    code_folders.pop(remove_index)
-
-        for code_folder in code_folders:
-            code_folder += '.{}'.format(scripts.ScriptPythonData.get_data_extension())
-            if code_folder not in synced_scripts:
-                synced_scripts.append(code_folder)
-                synced_states.append(False)
-
-        self.set_scripts_manifest(scripts_to_add=synced_scripts, states=synced_states)
 
     # ================================================================================================
     # ======================== CODE
@@ -817,7 +824,7 @@ class ScriptObject(build.BuildObject, object):
         if code_name == self.MANIFEST_FILE:
             code_name += '.{}'.format(scripts.ScriptManifestData.get_data_extension())
         else:
-            code_name += '.{}'.format(scripts.ScriptPythonData.get_data_extension())
+            code_name += '.{}'.format(self.SCRIPT_EXTENSION)
 
         if not basename:
             code_name = path_utils.join_path(code_file, code_name)
@@ -899,9 +906,9 @@ class ScriptObject(build.BuildObject, object):
         # TODO: We should retrieve file path directly from data instance (not through data object)
         file_name = data_inst.get_file()
 
-        if not self.is_in_manifest('{}.{}'.format(name, scripts.ScriptPythonData.get_data_extension())):
+        if not self.is_in_manifest('{}.{}'.format(name, self.SCRIPT_EXTENSION)):
             self.set_scripts_manifest(
-                ['{}.{}'.format(name, scripts.ScriptPythonData.get_data_extension())], append=True)
+                ['{}.{}'.format(name, self.SCRIPT_EXTENSION)], append=True)
 
         return file_name
 
@@ -936,8 +943,8 @@ class ScriptObject(build.BuildObject, object):
         new_basename = path_utils.get_basename(new_name)
 
         update_path = path_utils.join_path(
-            test_path, old_basename + '.{}'.format(scripts.ScriptPythonData.get_data_extension()))
-        folder.rename_folder(update_path, new_basename+'.{}'.format(scripts.ScriptPythonData.get_data_extension()))
+            test_path, old_basename + '.{}'.format(self.SCRIPT_EXTENSION))
+        folder.rename_folder(update_path, new_basename+'.{}'.format(self.SCRIPT_EXTENSION))
 
         return file_name
 

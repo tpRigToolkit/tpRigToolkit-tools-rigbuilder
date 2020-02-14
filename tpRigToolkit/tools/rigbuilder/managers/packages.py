@@ -32,10 +32,21 @@ class PackagesManager(object):
         self._registered_packages = dict()
         self._registered_package_paths = dict()
         self._registered_bueprints = dict()
-        self._registered_nodes = dict()
 
         self._package_paths = python.force_list(packages_paths) if packages_paths else list()
         self._update_package_paths_from_environment()
+
+    @property
+    def registered_packages(self):
+        return self._registered_packages
+
+    @property
+    def registered_package_paths(self):
+        return self._registered_package_paths
+
+    @property
+    def registered_blueprints(self):
+        return self._registered_bueprints
 
     def initialize(self):
         """
@@ -62,6 +73,18 @@ class PackagesManager(object):
 
         if valid_paths:
             self._load_packages(valid_paths)
+
+    def get_package_by_name(self, package_name):
+        """
+        Returns package with given name if exists
+        :param package_name: str, name of the package to search for
+        :return: Package or None
+        """
+
+        if package_name not in self._registered_packages:
+            return None
+
+        return self._registered_packages[package_name]
 
     def _load_packages(self, package_path=None):
         """
@@ -94,7 +117,8 @@ class PackagesManager(object):
 
         for name, pkg in self._registered_packages.items():
             package_name = pkg.__class__.__name__
-            print(name, pkg)
+            for n in pkg.builder_node_classes.values():
+                n.PACKAGE_NAME = package_name
 
     def _update_package_paths_from_environment(self):
         """
