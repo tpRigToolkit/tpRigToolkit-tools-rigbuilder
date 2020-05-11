@@ -7,11 +7,9 @@ Module that contains build node implementation for new scenes
 
 from __future__ import print_function, division, absolute_import
 
-from Qt.QtWidgets import *
+import tpDcc as tp
 
-from tpRigToolkit.core import resource
 from tpRigToolkit.tools.rigbuilder.objects import build
-from tpRigToolkit.tools.rigbuilder.widgets import properties
 
 
 class NewScene(build.BuildObject, object):
@@ -19,20 +17,21 @@ class NewScene(build.BuildObject, object):
     COLOR = [255, 255, 0]
     SHORT_NAME = 'NEW'
     DESCRIPTION = 'Creates a new DCC scene'
-    ICON = resource.ResourceManager().icon('new_file')
+    ICON = 'new'
 
     def __init__(self, name=None):
         super(NewScene, self).__init__(name=name)
 
-    def get_option_file(self):
-        super(NewScene, self).get_option_file()
+    def run(self, **kwargs):
+        force = self.get_option('Force', group='Inputs')
+        tp.Dcc.new_file(force=force)
 
-        self.add_option('node_title', 'Hello World!', option_type='title')
+        return True
 
-    def create_properties_widget(self, properties_widget):
-        super(NewScene, self).create_properties_widget(properties_widget=properties_widget)
+    def setup_options(self):
+        setup_options = super(NewScene, self).setup_options()
 
-        base_category = properties.CollapsibleFormWidget(head_name='Inputs')
-        self._force = QCheckBox()
-        base_category.add_widget(label='Force', widget=self._force)
-        properties_widget.add_widget(base_category)
+        setup_options['Inputs'] = {'value': True, 'group': None, 'type': 'group'}
+        setup_options['Force'] = {'value': True, 'group': 'Inputs', 'type': 'bool'}
+
+        return setup_options
