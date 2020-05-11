@@ -13,9 +13,10 @@ import pkgutil
 import inspect
 import traceback
 
-from tpPyUtils import decorators
-from tpDccLib.core import data as core_data, scripts
+from tpDcc.core import data as core_data, scripts
+from tpDcc.libs.python import decorators
 
+from tpRigToolkit.tools import rigbuilder
 from tpRigToolkit.tools.rigbuilder import register
 
 LOGGER = logging.getLogger('tpRigToolkit')
@@ -53,7 +54,7 @@ class ScriptsManager(object):
         if directory not in self.directories:
             self.directories.append(directory)
             if do_update:
-                self.update_data_classes()
+                self.load_data_classes()
 
     def set_directories(self, directories):
         """
@@ -119,7 +120,6 @@ class ScriptsManager(object):
                 module = loader.find_module(mod_name).load_module(mod_name)
                 if _reload:
                     reload(module)
-
                 for cname, obj in inspect.getmembers(module, inspect.isclass):
                     if not issubclass(obj, core_data.FileData):
                         continue

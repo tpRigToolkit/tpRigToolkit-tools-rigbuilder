@@ -12,8 +12,8 @@ import inspect
 import logging
 import traceback
 
-from tpPyUtils import path, decorators
-from tpQtLib.widgets.library import manager
+from tpDcc.libs.python import path, decorators
+from tpDcc.libs.qt.widgets.library import manager
 
 from tpRigToolkit.tools.rigbuilder import register
 from tpRigToolkit.tools.rigbuilder.core import data, utils
@@ -62,11 +62,11 @@ class DataManager(manager.LibraryManager, object):
         Adds custom dat files located in the current data manager registered directories
         """
 
-        data_classes = list()
+        loaded_classes = list()
         for d in self._directories:
-            data_classes.extend(self._load_data_classes(d))
+            loaded_classes.extend(self._load_data_classes(d, do_reload=do_reload))
 
-        for data_cls in data_classes:
+        for data_cls in loaded_classes:
             self.register_item(data_cls)
 
     def _load_data_classes(self, directory, do_reload=False):

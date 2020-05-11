@@ -12,7 +12,7 @@ import pkgutil
 import logging
 import traceback
 
-from tpPyUtils import decorators, python, path as path_utils
+from tpDcc.libs.python import decorators, python, path as path_utils
 
 from tpRigToolkit.tools.rigbuilder import register
 from tpRigToolkit.tools.rigbuilder import packages
