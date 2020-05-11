@@ -11,9 +11,9 @@ from Qt.QtCore import *
 from Qt.QtWidgets import *
 from Qt.QtGui import *
 
-import tpDcc
+import tpDcc as tp
 from tpDcc.libs.qt.core import base
-from tpDcc.libs.qt.widgets import project, dividers, buttons
+from tpDcc.libs.qt.widgets import project, dividers, buttons, options
 
 
 class ProjectWidget(project.ProjectWidget, object):
@@ -25,9 +25,11 @@ class ProjectSettingsWidget(base.BaseWidget, object):
     exitSettings = Signal()
 
     def __init__(self, project=None, parent=None):
-        self._project = project
-
+        self._project = None
         super(ProjectSettingsWidget, self).__init__(parent=parent)
+
+        if project:
+            self.set_project(project)
 
     def ui(self):
         super(ProjectSettingsWidget, self).ui()
@@ -42,6 +44,15 @@ class ProjectSettingsWidget(base.BaseWidget, object):
         image_layout.addWidget(self._project_image)
         image_layout.addItem(QSpacerItem(30, 0, QSizePolicy.Expanding, QSizePolicy.Fixed))
 
+        self.main_layout.addWidget(dividers.Divider('Nomenclature'))
+        self._naming_widget = NamingWidget(project=self._project)
+        self.main_layout.addWidget(self._naming_widget)
+
+        self.main_layout.addWidget(dividers.Divider('Settings'))
+        self._project_options_widget = options.OptionsWidget(option_object=self._project)
+        self.main_layout.addWidget(self._project_options_widget)
+        self.main_layout.addWidget(dividers.Divider())
+
         bottom_layout = QVBoxLayout()
         bottom_layout.setContentsMargins(2, 2, 2, 2)
         bottom_layout.setSpacing(2)
@@ -54,8 +65,8 @@ class ProjectSettingsWidget(base.BaseWidget, object):
         buttons_layout.setSpacing(2)
         bottom_layout.addLayout(buttons_layout)
 
-        ok_icon = tpDcc.ResourcesMgr().icon('ok')
-        back_icon = tpDcc.ResourcesMgr().icon('back')
+        ok_icon = tp.ResourcesMgr().icon('ok')
+        back_icon = tp.ResourcesMgr().icon('back')
         self._ok_btn = buttons.StyleBaseButton(
             icon=ok_icon, icon_padding=2, parent=self, button_style=buttons.ButtonStyles.FlatStyle)
         self._ok_btn.setMinimumSize(QSize(35, 35))
@@ -85,6 +96,7 @@ class ProjectSettingsWidget(base.BaseWidget, object):
 
         self._project = project
 
+        self._project_options_widget.set_option_object(self._project)
         if self._project:
             self._project_image.setPixmap(
                 QPixmap(self._project.get_project_image()).scaled(QSize(150, 150), Qt.KeepAspectRatio))
@@ -102,3 +114,49 @@ class ProjectSettingsWidget(base.BaseWidget, object):
         """
 
         self.exitSettings.emit()
+
+
+class NamingWidget(base.BaseWidget, object):
+    def __init__(self, project=None, parent=None):
+
+        self._project = project
+
+        super(NamingWidget, self).__init__(parent=parent)
+
+        self.update_rules()
+
+    def get_main_layout(self):
+        main_layout = QHBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(2)
+
+        return main_layout
+
+    def ui(self):
+        super(NamingWidget, self).ui()
+
+        edit_icon = tp.ResourcesMgr().icon('edit')
+        name_lbl = QLabel('Naming Rule: ')
+        self._name_rules = QComboBox()
+        self._name_rules.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self._edit_btn = buttons.IconButton(icon=edit_icon, icon_padding=2, button_style=buttons.ButtonStyles.FlatStyle)
+        self.main_layout.addWidget(name_lbl)
+        self.main_layout.addWidget(self._name_rules)
+        self.main_layout.addWidget(dividers.get_horizontal_separator_widget())
+        self.main_layout.addWidget(self._edit_btn)
+
+    def set_project(self, project):
+        self._project = project
+        self.update_rules()
+
+    def update_rules(self):
+
+        try:
+            self._name_rules.blockSignals(True)
+
+            self._name_rules.clear()
+            if not self._project:
+                return
+        finally:
+            self._name_rules.blockSignals(False)
+
