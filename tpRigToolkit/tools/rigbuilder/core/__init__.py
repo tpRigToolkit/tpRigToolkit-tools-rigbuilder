@@ -17,6 +17,7 @@ order = [
 os.environ['RIGBUILDER_PATH'] = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 os.environ['RIGBUILDER_RUN'] = 'False'
 os.environ['RIGBULIDER_STOP'] = 'False'
+os.environ['RIGBUILDER_SETTINGS'] = ''
 os.environ['RIGBUILDER_TEMP_LOG'] = ''
 os.environ['RIGBUILDER_KEEP_TEMP_LOG'] = 'False'
 os.environ['RIGBUILDER_LAST_TEMP_LOG'] = ''
