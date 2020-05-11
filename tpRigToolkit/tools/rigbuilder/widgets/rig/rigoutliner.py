@@ -9,10 +9,10 @@ from __future__ import print_function, division, absolute_import
 
 from Qt.QtCore import *
 
-from tpPyUtils import path as path_utils
-from tpQtLib.widgets import treewidgets
+from tpDcc.libs.python import path as path_utils
+from tpDcc.libs.qt.widgets import treewidgets
 
-from tpRigToolkit.tools.rigbuilder.widgets import rigtree
+from tpRigToolkit.tools.rigbuilder.widgets.rig import rigtree
 
 
 class RigOutliner(treewidgets.EditFileTreeWidget, object):

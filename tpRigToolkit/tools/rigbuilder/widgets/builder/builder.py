@@ -10,13 +10,18 @@ from __future__ import print_function, division, absolute_import
 from Qt.QtCore import *
 from Qt.QtWidgets import *
 
-from tpQtLib.core import base
-from tpQtLib.widgets import splitters
+from tpDcc.libs.qt.core import base
+from tpDcc.libs.qt.widgets import dividers, treewidgets
 
-from tpRigToolkit.tools.rigbuilder.widgets import buildtree, nodestree
+from tpRigToolkit.tools.rigbuilder.widgets.base import nodestree
+from tpRigToolkit.tools.rigbuilder.widgets.builder import buildtree
 
 
-class RigBuilder(base.DirectoryWidget, object):
+class RigBuilder(treewidgets.EditFileTreeWidget, object):
+
+    description = 'Build'
+    TREE_WIDGET = buildtree.BuildTree
+    FILTER_WIDGET = treewidgets.FilterTreeDirectoryWidget
 
     createNode = Signal()
 
@@ -29,17 +34,26 @@ class RigBuilder(base.DirectoryWidget, object):
 
         super(RigBuilder, self).__init__(parent=parent)
 
-    def ui(self):
-        super(RigBuilder, self).ui()
-
-        self._builder_tree = buildtree.BuildTree(settings=self._settings)
-
-        self.main_layout.addWidget(self._builder_tree)
-
+        self.tree_widget.set_settings(settings)
         self.disable()
 
     def setup_signals(self):
-        self._builder_tree.createNode.connect(self.createNode.emit)
+        super(RigBuilder, self).setup_signals()
+
+        self.tree_widget.createNode.connect(self.createNode.emit)
+        self.tree_widget.renameNode.connect(self.refresh)
+
+    def _on_edit(self, flag):
+        """
+        Overrides base treewidgets.EditFileTreeWidget _on_edit function
+        Internal function that is called anytime the user presses the Edit button on the filter widget
+        If edit is ON, drag/drop operations in tree widget are disabled
+        :param flag: bool
+        """
+
+        super(RigBuilder, self)._on_edit(flag)
+
+        self.tree_widget.edit_state = flag
 
     # ================================================================================================
     # ======================== BASE
@@ -50,14 +64,14 @@ class RigBuilder(base.DirectoryWidget, object):
         Enables user interaction on builder tree
         """
 
-        self._builder_tree.setEnabled(True)
+        self.tree_widget.setEnabled(True)
 
     def disable(self):
         """
         Disables user interaction on builder tree
         """
 
-        self._builder_tree.setEnabled(False)
+        self.tree_widget.setEnabled(False)
 
     def get_project(self):
         """
@@ -76,9 +90,9 @@ class RigBuilder(base.DirectoryWidget, object):
         self._project = project
 
         if project:
-            self._builder_tree.set_directory(self._project.full_path)
+            self.tree_widget.set_directory(self._project.full_path)
         else:
-            self._builder_tree.set_directory(None)
+            self.tree_widget.set_directory(None)
 
     def rig(self):
         """
@@ -86,7 +100,7 @@ class RigBuilder(base.DirectoryWidget, object):
         :return: RigObject
         """
 
-        return self._builder_tree.object()
+        return self.tree_widget.object()
 
     def set_rig(self, rig):
         """
@@ -94,7 +108,7 @@ class RigBuilder(base.DirectoryWidget, object):
         :param rig: RigObject
         """
 
-        self._builder_tree.set_object(rig)
+        self.tree_widget.set_object(rig)
 
         self.enable() if rig else self.disable()
 
@@ -113,7 +127,7 @@ class RigBuilder(base.DirectoryWidget, object):
         """
 
         self._library = library
-        self._builder_tree.set_library(library)
+        self.tree_widget.set_library(library)
 
     def get_console(self):
         """
@@ -137,7 +151,7 @@ class RigBuilder(base.DirectoryWidget, object):
         :return: BuilderTree
         """
 
-        return self._builder_tree
+        return self.tree_widget
 
     def current_builder_node(self):
         """
@@ -145,14 +159,15 @@ class RigBuilder(base.DirectoryWidget, object):
         :return:
         """
 
-        return self._builder_tree.builder_node()
+        return self.tree_widget.builder_node()
 
     def refresh(self):
         """
         Refresh current item
         """
 
-        self._builder_tree.refresh(True)
+        self.tree_widget.refresh(sync=True)
+        self.tree_widget.selectionModel().clearSelection()
 
     def create_builder_node(self, builder_node, name=None, description=None):
         """
@@ -162,12 +177,13 @@ class RigBuilder(base.DirectoryWidget, object):
         :param description:
         """
 
-        return self._builder_tree.create_builder_node(builder_node=builder_node, name=name, description=description)
+        return self.tree_widget.create_builder_node(
+            builder_node=builder_node, name=name, description=description)
 
 
 class NodeBuilderCreator(base.BaseWidget, object):
 
-    nodeCreated = Signal(object)
+    nodeCreated = Signal(object, str, str, object)
     creationCanceled = Signal()
 
     def __init__(self, parent=None):
@@ -203,7 +219,7 @@ class NodeBuilderCreator(base.BaseWidget, object):
         grid_main_layout.addLayout(grid_layout)
 
         self.main_layout.addWidget(grid_main_widget)
-        self.main_layout.addLayout(splitters.SplitterLayout())
+        self.main_layout.addLayout(dividers.DividerLayout())
         self.main_layout.addWidget(self._nodes_tree)
 
         buttons_layout = QHBoxLayout()
@@ -239,6 +255,10 @@ class NodeBuilderCreator(base.BaseWidget, object):
     def set_build_node(self, build_node):
         self._build_node = build_node
 
+    def reset(self):
+        self._display_name_line.setText('')
+        self._description_name_line.setText('')
+
     def refresh(self):
         self._nodes_tree.refresh()
 
@@ -248,4 +268,7 @@ class NodeBuilderCreator(base.BaseWidget, object):
             self.nodeCreated.emit(None)
             return
 
-        self.nodeCreated.emit(selected_node)
+        node_display_name = self._display_name_line.text()
+        node_description = self._description_name_line.text()
+
+        self.nodeCreated.emit(selected_node, node_display_name, node_description, self._build_node)

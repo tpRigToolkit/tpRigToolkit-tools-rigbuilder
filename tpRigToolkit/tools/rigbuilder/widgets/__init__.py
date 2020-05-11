@@ -1,8 +1,10 @@
 order = [
-    'tpRigToolkit.tools.rigbuilder.widgets.basetree',
-    'tpRigToolkit.tools.rigbuilder.widgets.rigtree',
-    'tpRigToolkit.tools.rigbuilder.widgets.scriptstree',
-    'tpRigToolkit.tools.rigbuilder.widgets.buildtree',
+    'tpRigToolkit.tools.rigbuilder.widgets.base',
+    'tpRigToolkit.tools.rigbuilder.widgets.rig',
+    'tpRigToolkit.tools.rigbuilder.widgets.blueprint',
     'tpRigToolkit.tools.rigbuilder.widgets.builder',
-    'tpRigToolkit.tools.rigbuilder.widgets.rigoutliner'
+    'tpRigToolkit.tools.rigbuilder.widgets.puppeteer',
+    'tpRigToolkit.tools.rigbuilder.widgets.hub'
 ]
+
+

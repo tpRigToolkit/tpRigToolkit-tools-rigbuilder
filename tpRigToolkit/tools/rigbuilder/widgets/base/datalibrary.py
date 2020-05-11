@@ -7,10 +7,13 @@ Module that contains data library widget for tpRigToolkit.tools.rignode
 
 from __future__ import print_function, division, absolute_import
 
-from tpQtLib.widgets.library import window
+import os
 
+from tpDcc.libs.qt.widgets.library import window
+
+import tpRigToolkit
 from tpRigToolkit.tools import rigbuilder
-from tpRigToolkit.tools.rigbuilder.core import utils, datalibrary
+from tpRigToolkit.tools.rigbuilder.core import utils, datalibrary, consts
 from tpRigToolkit.tools.rigbuilder.objects import helpers
 
 
@@ -60,12 +63,21 @@ class DataLibraryWindow(window.LibraryWindow):
         is_rig = helpers.RigHelpers().is_rig(rig_path)
         if not is_rig:
             return
-
         current_rig = helpers.RigHelpers().get_rig(rig_path)
         current_rig.set_library(self.library())
-        rig_data_path = current_rig.get_data_path()
 
-        create_widget.set_folder_path(rig_data_path)
+        data_path = current_rig.get_data_path()
+
+        selected_path = self.selected_folder_path()
+        if selected_path and os.path.isdir(selected_path):
+            if selected_path.endswith(consts.DATA_FOLDER):
+                data_path = selected_path
+            else:
+                tpRigToolkit.logger.warning(
+                    'Selected Path "{}" is not a valid data path. Using current rig ({}) data path: "{}"'.format(
+                        selected_path, current_rig.get_name(), data_path))
+
+        create_widget.set_folder_path(data_path)
         create_widget._folder_widget.folder_line.setReadOnly(True)
         create_widget._folder_widget.folder_btn.setVisible(False)
 

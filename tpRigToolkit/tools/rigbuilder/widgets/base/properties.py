@@ -12,9 +12,9 @@ from collections import OrderedDict
 from Qt.QtCore import *
 from Qt.QtWidgets import *
 
-import tpQtLib
-from tpQtLib.core import qtutils, base
-from tpQtLib.widgets import search
+import tpDcc
+from tpDcc.libs.qt.core import qtutils, base
+from tpDcc.libs.qt.widgets import search
 
 
 class PropertiesWidget(base.BaseWidget, object):
@@ -24,8 +24,8 @@ class PropertiesWidget(base.BaseWidget, object):
     def __init__(self, search_by_headers=False, parent=None):
 
         self._search_by_headers = search_by_headers
-        self._lock_icon = tpQtLib.resource.icon('lock')
-        self._unlock_icon = tpQtLib.resource.icon('unlock')
+        self._lock_icon = tpDcc.ResourcesMgr().icon('lock')
+        self._unlock_icon = tpDcc.ResourcesMgr().icon('unlock')
 
         super(PropertiesWidget, self).__init__(parent=parent)
 
@@ -54,7 +54,7 @@ class PropertiesWidget(base.BaseWidget, object):
         self._lock_btn.setCheckable(True)
         self._lock_btn.setIcon(self._unlock_icon)
         self._tear_off_btn = QToolButton()
-        self._tear_off_btn.setIcon(tpQtLib.resource.icon('new_copy', theme='color'))
+        self._tear_off_btn.setIcon(tpDcc.ResourcesMgr().icon('new_copy', theme='color'))
 
         self._search_layout.addWidget(self._search_line)
         self._search_layout.addWidget(self._lock_btn)
@@ -178,7 +178,7 @@ class PropertiesTree(QTreeWidget, object):
         v = OrderedDict()
         for i in range(model.rowCount(parent_index)):
             index = model.index(i, 0, parent_index)
-            self.fill_dict_form_model(index, v, model)
+            self.fill_dict_from_model(index, v, model)
         if len(v) == 0:
             v = None
         model_dict[parent_index.data()] = v

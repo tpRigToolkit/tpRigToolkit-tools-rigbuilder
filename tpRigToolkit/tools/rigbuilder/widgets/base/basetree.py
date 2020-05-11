@@ -14,10 +14,10 @@ from Qt.QtCore import *
 from Qt.QtWidgets import *
 from Qt.QtGui import *
 
-import tpDccLib as tp
-from tpPyUtils import fileio, path as path_utils
-from tpQtLib.core import qtutils
-from tpQtLib.widgets import treewidgets
+import tpDcc as tp
+from tpDcc.libs.python import fileio, path as path_utils
+from tpDcc.libs.qt.core import qtutils
+from tpDcc.libs.qt.widgets import treewidgets
 
 from tpRigToolkit.tools.rigbuilder.core import utils
 from tpRigToolkit.tools.rigbuilder.items import base
@@ -27,7 +27,7 @@ LOGGER = logging.getLogger('tpRigToolkit')
 
 class BaseTree(treewidgets.FileTreeWidget, object):
 
-    HEADER_LABELS = ['Build']
+    HEADER_LABELS = ['BaseTree']
     ITEM_WIDGET = base.BaseItem
     NEW_ITEM_NAME = 'new_rig'
 
@@ -35,7 +35,6 @@ class BaseTree(treewidgets.FileTreeWidget, object):
     itemRenamed = Signal(object, object)
     itemRemoved = Signal(object)
     itemDuplicated = Signal()
-    itemFocused = Signal()
 
     def __init__(self, settings=None, parent=None):
         super(BaseTree, self).__init__(parent=parent)
@@ -45,14 +44,17 @@ class BaseTree(treewidgets.FileTreeWidget, object):
         self._settings = settings
 
         self._handle_selection_change = True
+        self._disable_modifiers = True
         self._update_checkbox = True
         self._shift_activate = False
         self._dragged_item = None
+        self._drag_parent = None
         self._break_index = None
         self._start_index = None
         self._break_item = None
         self._start_item = None
         self._hierarchy = True
+        self._allow_scripts_manifest_update = True
 
         self._context_menu = None
 
@@ -78,6 +80,26 @@ class BaseTree(treewidgets.FileTreeWidget, object):
         self.customContextMenuRequested.connect(self._on_item_menu)
 
     # ================================================================================================
+    # ======================== PROPERTIES
+    # ================================================================================================
+
+    @property
+    def start_item(self):
+        return self._start_item
+
+    @property
+    def start_index(self):
+        return self._start_index
+
+    @property
+    def break_item(self):
+        return self._break_item
+
+    @property
+    def break_index(self):
+        return self._break_index
+
+    # ================================================================================================
     # ======================== OVERRIDES
     # ================================================================================================
 
@@ -93,15 +115,38 @@ class BaseTree(treewidgets.FileTreeWidget, object):
         self._checkbox.setGeometry(QRect(3, 2, 16, 17))
 
     def mousePressEvent(self, event):
-        self._handle_selection_change = True
+
+        if self._disable_modifiers:
+            modifiers = QApplication.keyboardModifiers()
+            if modifiers == Qt.ControlModifier or modifiers == (Qt.ControlModifier | Qt.ShiftModifier):
+                return
+
         item = self.itemAt(event.pos())
         parent = self.invisibleRootItem()
         if item:
             if item.parent():
                 parent = item.parent()
+        # else:
+        #     self.setCurrentItem(self.invisibleRootItem())
+
+        self._drag_parent = parent
         self._dragged_item = item
         super(BaseTree, self).mousePressEvent(event)
-        self.itemFocused.emit()
+
+    def mouseDoubleClickEvent(self, event):
+        index = self.indexAt(event.pos())
+        self.doubleClicked.emit(index)
+
+    def mouseMoveEvent(self, event):
+        model_index = self.indexAt(event.pos())
+        item = self.itemAt(event.pos())
+        if not item or model_index.column() == 1:
+            self._clear_selection()
+            self.setCurrentItem(self.invisibleRootItem())
+        if event.button() == Qt.RightToLeft:
+            return
+        if model_index.column() == 0 and item:
+            super(BaseTree, self).mouseMoveEvent(event)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Shift:
@@ -111,37 +156,37 @@ class BaseTree(treewidgets.FileTreeWidget, object):
         if event.key() == Qt.Key_Shift:
             self._shift_activate = False
 
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasText():
-            event.setDropAction(Qt.CopyAction)
-            event.accept()
-        else:
-            event.ignore()
+    # def dragEnterEvent(self, event):
+    #     if event.mimeData().hasText():
+    #         event.setDropAction(Qt.CopyAction)
+    #         event.accept()
+    #     else:
+    #         event.ignore()
 
-    def dragMoveEvent(self, event):
-        if event.mimeData().hasText:
-            event.accept()
-        else:
-            event.ignore()
+    # def dragMoveEvent(self, event):
+    #     if event.mimeData().hasText:
+    #         event.accept()
+    #     else:
+    #         event.ignore()
 
-    def dropEvent(self, event):
-        if event.mimeData().hasText():
-            if not self.library():
-                event.ignore()
-            if not self.library().manager():
-                event.ignore()
-
-            item = self.library().manager().item_from_path(event.mimeData().text())
-            if not item:
-
-                event.ignore()
-            if not os.path.isfile(item.path()):
-                event.ignore()
-            data_name, data_extension = os.path.splitext(os.path.basename(item.path()))
-            self._on_create_data_import(data_name=data_name, data_extension=data_extension)
-            event.accept()
-        else:
-            event.ignore()
+    # def dropEvent(self, event):
+    #     if event.mimeData().hasText():
+    #         if not self.library():
+    #             event.ignore()
+    #         if not self.library().manager():
+    #             event.ignore()
+    #
+    #         item = self.library().manager().item_from_path(event.mimeData().text())
+    #         if not item:
+    #
+    #             event.ignore()
+    #         if not os.path.isfile(item.path()):
+    #             event.ignore()
+    #         data_name, data_extension = os.path.splitext(os.path.basename(item.path()))
+    #         self._on_create_data_import(data_name=data_name, data_extension=data_extension)
+    #         event.accept()
+    #     else:
+    #         event.ignore()
 
     def _add_item(self, file_name, state, parent=None, **kwargs):
         """
@@ -187,7 +232,6 @@ class BaseTree(treewidgets.FileTreeWidget, object):
         :param item: ScriptItem
         """
 
-        super(BaseTree, self)._on_item_collapsed(item=item)
         if self._shift_activate:
             child_count = item.childCount()
             for i in range(child_count):
@@ -262,14 +306,6 @@ class BaseTree(treewidgets.FileTreeWidget, object):
 
         self._library = library
 
-    def break_index(self):
-        """
-        Returns break index
-        :return: int
-        """
-
-        return self._break_index
-
     def can_handle_selection_changes(self):
         """
         Returns whether the tree can handle events when the user changes script selection
@@ -289,21 +325,6 @@ class BaseTree(treewidgets.FileTreeWidget, object):
 
         return False
 
-    def is_break_point(self, directory):
-        """
-        Checks whether item has a break point or not
-        :param directory: str
-        :return: bool
-        """
-
-        item = self._get_item_by_name(directory)
-        model_index = self.indexFromItem(item)
-        index = model_index.internalId()
-        if index == self._break_index:
-            return True
-
-        return False
-
     def is_start_point(self, directory):
         """
         Checks whether item has a start point or not
@@ -315,6 +336,62 @@ class BaseTree(treewidgets.FileTreeWidget, object):
         model_index = self.indexFromItem(item)
         index = model_index.internalId()
         if index == self._start_index:
+            return True
+
+        return False
+
+    def set_start_point(self, item=None):
+        """
+        Sets starts point in given item
+        :param item: ScriptItem
+        """
+
+        self.cancel_start_point()
+        if not item:
+            items = self.selectedItems()
+            if not items:
+                return
+            item = items[0]
+        self.clearSelection()
+
+        item_index = self.indexFromItem(item)
+        if item_index.internalId() == self._break_index:
+            self.cancel_break_point()
+
+        self._start_index = item_index.internalId()
+        self._start_item = item
+        if tp.is_maya():
+            brush = QBrush(QColor(0, 70, 20))
+        else:
+            brush = QBrush(QColor(230, 240, 230))
+
+        item.setBackground(0, brush)
+
+    def cancel_start_point(self):
+        """
+        Removes start point
+        """
+
+        if self._start_item:
+            try:
+                self._start_item.setBackground(0, QBrush())
+            except Exception:
+                pass
+        self._start_index = None
+        self._start_item = None
+        self.repaint()
+
+    def is_break_point(self, directory):
+        """
+        Checks whether item has a break point or not
+        :param directory: str
+        :return: bool
+        """
+
+        item = self._get_item_by_name(directory)
+        model_index = self.indexFromItem(item)
+        index = model_index.internalId()
+        if index == self._break_index:
             return True
 
         return False
@@ -339,37 +416,10 @@ class BaseTree(treewidgets.FileTreeWidget, object):
 
         self._break_index = item_index.internalId()
         self._break_item = item
-        if tp.Dcc.get_name() == tp.Dccs.Maya:
+        if tp.is_maya():
             brush = QBrush(QColor(70, 0, 0))
         else:
             brush = QBrush(QColor(240, 230, 230))
-
-        item.setBackground(0, brush)
-
-    def set_start_point(self, item=None):
-        """
-        Sets starts point in given item
-        :param item: ScriptItem
-        """
-
-        self.cancel_start_point()
-        if not item:
-            items = self.selectedItems()
-            if not items:
-                return
-            item = items[0]
-        self.clearSelection()
-
-        item_index = self.indexFromItem(item)
-        if item_index.internalId() == self._break_index:
-            self.cancel_break_point()
-
-        self._start_index = item_index.internalId()
-        self._start_item = item
-        if tp.Dcc.get_name() == tp.Dccs.Maya:
-            brush = QBrush(QColor(0, 70, 20))
-        else:
-            brush = QBrush(QColor(230, 240, 230))
 
         item.setBackground(0, brush)
 
@@ -385,20 +435,6 @@ class BaseTree(treewidgets.FileTreeWidget, object):
                 pass
         self._break_index = None
         self._break_item = None
-        self.repaint()
-
-    def cancel_start_point(self):
-        """
-        Removes start point
-        """
-
-        if self._start_item:
-            try:
-                self._start_item.setBackground(0, QBrush())
-            except Exception:
-                pass
-        self._start_index = None
-        self._start_item = None
         self.repaint()
 
     def cancel_points(self):
@@ -458,6 +494,53 @@ class BaseTree(treewidgets.FileTreeWidget, object):
         """
 
         return item.get_path()
+
+    # ================================================================================================
+    # ======================== MANIFEST
+    # ================================================================================================
+
+    def get_current_scripts_manifest(self):
+        """
+        Returns the current script manifest of the rig
+        :return:
+        """
+
+        scripts = list()
+        states = list()
+
+        items = self._get_all_items()
+        for item in items:
+            item_name = item.get_text()
+            item_path = self.get_item_path(item)
+            if item_path:
+                item_name = path_utils.join_path(item_path, item_name)
+
+            state = item.checkState(0)
+            if state == 0 or state is False or state == Qt.Unchecked:
+                state = False
+            elif state == 2 or item is True or state == Qt.Checked or Qt.PartiallyChecked:
+                state = True
+
+            scripts.append(item_name)
+            states.append(state)
+
+        return scripts, states
+
+    def update_scripts_manifest(self):
+        """
+        Forces the update (if allowed) of the scripts manifest
+        """
+
+        if not self._allow_scripts_manifest_update:
+            return
+
+        current_object = self.object()
+        if not current_object:
+            LOGGER.debug('Impossible to get object files because script object is not defined!')
+            return
+
+        scripts, states = self.get_current_scripts_manifest()
+        current_object.set_scripts_manifest(scripts, states)
 
     # ================================================================================================
     # ======================== INTERNAL
@@ -522,24 +605,21 @@ class BaseTree(treewidgets.FileTreeWidget, object):
             item.setCheckState(0, Qt.Unchecked)
 
         if self._hierarchy:
+            # Drop enabled
             item.setFlags(
                 Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsDragEnabled |
                 Qt.ItemIsUserCheckable | Qt.ItemIsDropEnabled)
         else:
+            # Disable item drop (all flags except drop)
             item.setFlags(
                 Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsEnabled |
                 Qt.ItemIsDragEnabled | Qt.ItemIsUserCheckable)
 
         item.set_object(self.object())
 
-    def _post_setup_item(self, item, state):
-        """
-       Internal function that is called after adding an item into the tree
-       :param item: ScriptManifestItem
-       :param state: bool
-       """
-
-        pass
+        # Used to avoid script manifest update when check states of ScriptManifestItem is changed programatically
+        if hasattr(item, 'handle_manifest'):
+            item.handle_manifest = True
 
     def _get_item_path_name(self, item, keep_extension=False):
         """
@@ -607,6 +687,7 @@ class BaseTree(treewidgets.FileTreeWidget, object):
 
         items = self._get_all_items()
         for item in items:
+            item_path = self.get_item_path(item)
             check_name = self._get_item_path_name(item, keep_extension=True)
             if check_name == item_name:
                 return item
@@ -697,9 +778,19 @@ class BaseTree(treewidgets.FileTreeWidget, object):
         :param new_name: str
         :param item: ScriptItem
         """
-        after_name = self._handle_item_reparent(old_name, new_name)
-        basename = path_utils.get_basename(after_name)
+        after_name = self._handle_item_reparent(old_name, new_name, item)
         self.itemRenamed.emit(old_name, after_name)
+
+    def _handle_item_reparent(self, old_name, new_name, item):
+        """
+        Internal function that handles the parenting of script tree script items
+        :param old_name: str
+        :param new_name: str
+        :param item: str
+        :return: str
+        """
+
+        pass
 
     def _reparent_item(self, name, item, parent_item):
         """

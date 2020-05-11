@@ -14,16 +14,15 @@ from functools import partial
 from Qt.QtCore import *
 from Qt.QtWidgets import *
 
-from tpQtLib.core import base
-from tpQtLib.widgets import stack, options
+import tpDcc
+from tpDcc.libs.qt.core import base
+from tpDcc.libs.qt.widgets import stack, options
 
-from tpRigToolkit.core import resource
 from tpRigToolkit.tools import rigbuilder
 from tpRigToolkit.tools.rigbuilder.core import consts, utils
 from tpRigToolkit.tools.rigbuilder.items import script
 from tpRigToolkit.tools.rigbuilder.objects import helpers, blueprint
-from tpRigToolkit.tools.rigbuilder.widgets import scriptstree
-
+from tpRigToolkit.tools.rigbuilder.widgets.rig import scriptstree
 
 LOGGER = logging.getLogger('tpRigToolkit')
 
@@ -44,7 +43,7 @@ class BlueprintsEditor(base.BaseWidget, object):
 
         self._build_btn = QToolButton()
         self._build_btn.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
-        self._build_btn.setIcon(resource.ResourceManager().icon('play'))
+        self._build_btn.setIcon(tpDcc.ResourcesMgr().icon('play'))
         self._build_btn.setText('Build')
         self._toolbar.addWidget(self._build_btn)
 
@@ -238,11 +237,11 @@ class BlueprintsTree(QTreeWidget, object):
 
         item_type = item.item_type
         if item_type == 'root':
-            create_icon = resource.ResourceManager().icon('import')
+            create_icon = tpDcc.ResourcesMgr().icon('import')
             create_blueprint_action = context_menu.addAction(create_icon, 'New Blueprint')
             create_blueprint_action.triggered.connect(partial(self._on_create_blueprint, item.data(0, Qt.UserRole)))
         elif item_type == consts.DataTypes.Blueprint:
-            play_icon = resource.ResourceManager().icon('play')
+            play_icon = tpDcc.ResourcesMgr().icon('play')
             build_blueprint_action = context_menu.addAction(play_icon, 'Build Blueprint')
             build_blueprint_action.triggered.connect(partial(self._on_build_blueprint, item.data(0, Qt.UserRole)))
 

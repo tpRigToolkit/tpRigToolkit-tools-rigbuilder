@@ -7,7 +7,7 @@ Module that contains console widget for tpRigToolkit.tools.rigbuilder
 
 from __future__ import print_function, division, absolute_import
 
-from tpQtLib.widgets import console
+from tpDcc.libs.qt.widgets import console
 
 
 class Console(console.Console, object):

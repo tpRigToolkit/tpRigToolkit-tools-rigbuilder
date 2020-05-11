@@ -10,8 +10,8 @@ from __future__ import print_function, division, absolute_import
 from Qt.QtCore import *
 from Qt.QtWidgets import *
 
-from tpQtLib.core import base
-from tpQtLib.widgets import splitters
+from tpDcc.libs.qt.core import base
+from tpDcc.libs.qt.widgets import dividers
 
 
 class BlueprintWidget(base.BaseWidget, object):
@@ -39,7 +39,7 @@ class PresetsList(base.BaseWidget, object):
 
         self._presets_list = QListWidget()
 
-        self.main_layout.addWidget(splitters.Splitter('Presets'))
+        self.main_layout.addWidget(dividers.Divider('Presets'))
         self.main_layout.addWidget(self._presets_list)
 
 
@@ -52,5 +52,5 @@ class BlueprintsOutliner(base.BaseWidget, object):
 
         self._blueprints_list = QListWidget()
 
-        self.main_layout.addWidget(splitters.Splitter('Current Blueprints'))
+        self.main_layout.addWidget(dividers.Divider('Current Blueprints'))
         self.main_layout.addWidget(self._blueprints_list)

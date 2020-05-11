@@ -12,27 +12,36 @@ import logging
 from Qt.QtCore import *
 from Qt.QtWidgets import *
 
-import tpQtLib
-from tpQtLib.core import tool
-from tpQtLib.widgets import tabs, breadcrumb, stack, options
-from tpPyUtils import osplatform, path as path_utils
+import tpDcc
+from tpDcc.libs.qt.core import window
+from tpDcc.libs.qt.widgets import tabs, breadcrumb, stack, options
+from tpDcc.libs.python import osplatform, path as path_utils
 
-from tpRigToolkit.tools.rigbuilder.widgets import builder, rigoutliner, blueprint, blueprintseditor
+from tpRigToolkit.tools.rigbuilder.core import tool
+from tpRigToolkit.tools.rigbuilder.widgets.builder import builder
+from tpRigToolkit.tools.rigbuilder.widgets.rig import rigoutliner
+from tpRigToolkit.tools.rigbuilder.widgets.blueprint import blueprintseditor, blueprint
+from tpRigToolkit.tools.rigbuilder.widgets.puppeteer import puppeteer
 from tpRigToolkit.tools.rigbuilder.objects import rig
-from tpRigToolkit.tools.rigbuilder.tools import datalibrary, controls, properties
+from tpRigToolkit.tools.rigbuilder.tools import datalibrary, controls, properties, puppeteer as puppet_tools
 from tpRigToolkit.tools.rigbuilder.tools import buildnodeslibrary, blueprintslibrary
 
 LOGGER = logging.getLogger('tpRigToolkit')
 
 
-class HubWidget(tpQtLib.Window, object):
+class HubWidget(window.BaseWindow, object):
+
+    WindowId = 'RigBuilderHub'
+
     def __init__(self, project=None, settings=None, console=None, progress_bar=None, parent=None):
 
         self._library = None
         self._project = project
+        self._settings = settings
         self._console = console
         self._progress_bar = progress_bar
         self._tools_classes = list()
+        self._tools = set()
 
         self._current_rig = None
         self._current_builder_item = None
@@ -40,19 +49,12 @@ class HubWidget(tpQtLib.Window, object):
         self._handle_selection_change = True
 
         # TODO: Tool registration should be automatic
-        for tool_class in [
-            datalibrary.DataLibrary, controls.ControlsTool, properties.PropertiesTool,
-            buildnodeslibrary.BuldNodesLibrary, blueprintslibrary.BlueprintsLibrary]:
+        for tool_class in [datalibrary.DataLibrary, controls.ControlsTool, properties.PropertiesTool,
+                           buildnodeslibrary.BuldNodesLibrary, blueprintslibrary.BlueprintsLibrary,
+                           puppet_tools.PuppetPartsBuilderTool]:
             self.register_tool_class(tool_class)
 
-        super(HubWidget, self).__init__(
-            name='HubWidgetWindow',
-            title='Hub Widget',
-            settings=settings,
-            parent=parent,
-            show_dragger=False,
-            auto_load=False
-        )
+        super(HubWidget, self).__init__(parent=parent,)
 
         self.statusBar().hide()
 
@@ -92,6 +94,7 @@ class HubWidget(tpQtLib.Window, object):
 
         self._blueprint_editor = blueprintseditor.BlueprintsEditor(settings=self._settings, project=self._project)
         self._blueprint = blueprint.BlueprintWidget()
+        # self._puppeteer = puppeteer.PuppeteerWidget()
 
         rig_outliner_splitter = QSplitter(self)
         rig_outliner_splitter.setOrientation(Qt.Vertical)
@@ -129,14 +132,15 @@ class HubWidget(tpQtLib.Window, object):
         main_splitter.addWidget(tab_widget)
 
         self._second_tab.addTab(self._builder, 'Builder')
-        self._second_tab.addTab(self._blueprint, 'Template')
+        # self._second_tab.addTab(self._blueprint, 'Template')
         main_splitter.setSizes([1, 1])
 
         self._main_tab.addTab(main_splitter, 'Rig')
         self._main_tab.addTab(self._blueprint_editor, 'Blueprint')
-
+        # self._main_tab.addTab(self._puppeteer, 'Puppeteer')
+        #
         self._builder_creator = builder.NodeBuilderCreator()
-
+        #
         self._stack.addWidget(self._main_tab)
         self._stack.addWidget(self._builder_creator)
 
@@ -146,6 +150,7 @@ class HubWidget(tpQtLib.Window, object):
         self._builder.createNode.connect(self._on_create_builder_node)
         self._builder_creator.creationCanceled.connect(self._on_cancel_builder_node_creation)
         self._builder_creator.nodeCreated.connect(self._on_builder_node_created)
+        # self._puppeteer.puppetRemoved.connect(self._on_puppet_removed)
 
     # ================================================================================================
     # ======================== BASE
@@ -253,19 +258,54 @@ class HubWidget(tpQtLib.Window, object):
         :param name: str,
         """
 
-        rig_names = name.split('/')
-        self._title.set(rig_names)
+        rig_names = [{'text': rig_name} for rig_name in name.split('/')]
+        self._title.set_items(rig_names)
 
     def reset_title(self):
         """
         Resets title
         """
 
-        self._title.set(['No Rig Selected'])
+        self._title.set_items([{'text': 'No Rig Selected'}])
 
     # ================================================================================================
     # ======================== TOOLS
     # ================================================================================================
+
+    def register_tool_instance(self, instance):
+        """
+        Registers given tool instance
+        Used to prevent tool classes being garbage collected and to save tool widgets states
+        :param instance: Tool
+        """
+
+        self._tools.add(instance)
+
+    def unregister_tool_instance(self, instance):
+        """
+        Unregister tool instance
+        :param instance: Tool
+        """
+
+        if instance not in self._tools:
+            return False
+        self._tools.remove(instance)
+
+        return True
+
+    def get_registered_tools(self, class_name_filters=None):
+        if class_name_filters is None:
+            class_name_filters = list()
+
+        if len(class_name_filters) == 0:
+            return self._tools
+        else:
+            result = list()
+            for tool in self._tools:
+                if tool.__class__.__name__ in class_name_filters:
+                    result.append(tool)
+
+            return result
 
     def register_tool_class(self, tool_class):
         """
@@ -433,8 +473,7 @@ class HubWidget(tpQtLib.Window, object):
             title = self._current_rig.get_name()
 
         if rig_name:
-            project_path = self._get_filtered_project_path()
-            self._current_rig.load(project_path)
+            self._current_rig.load(rig_name)
             self.set_title(title)
         else:
             self.reset_title()
@@ -501,8 +540,7 @@ class HubWidget(tpQtLib.Window, object):
         item_node = item.node
 
         properties_widget.clear()
-
-        properties_widget.assign_properties_widget(properties_fill_delegate=item_node.create_properties_widget)
+        properties_widget.set_object(item_node)
 
     # ================================================================================================
     # ======================== CALLBACKS
@@ -523,13 +561,32 @@ class HubWidget(tpQtLib.Window, object):
         self._refresh_selected_builder_node()
 
     def _on_create_builder_node(self):
+        self._builder_creator.reset()
         self._builder_creator.set_build_node(self._builder.current_builder_node())
         self._stack.slide_in_index(1)
 
     def _on_cancel_builder_node_creation(self):
         self._stack.slide_in_index(0)
 
-    def _on_builder_node_created(self, builder_node):
+    def _on_builder_node_created(self, builder_node, name, description, parent_node):
         if builder_node:
-            self._builder.create_builder_node(builder_node)
+            if parent_node:
+                parent_name = parent_node.get_name()
+                parent_path = parent_node.get_path()
+                if parent_path:
+                    if parent_name.startswith(parent_path):
+                        name = '{}/{}'.format(parent_name, name)
+                    else:
+                        name = '{}/{}/{}'.format(parent_path, parent_name, name)
+                else:
+                    name = '{}/{}'.format(parent_name, name)
+            self._builder.create_builder_node(builder_node, name=name, description=description)
         self._stack.slide_in_index(0)
+
+    def _on_puppet_removed(self):
+        if self._project:
+            project_name = self._project.get_name()
+            tpDcc.ToolsMgr().launch_tool_by_id(
+                'tpRigToolkit-tools-rigbuilder', do_reload=False, debug=False, project_name=project_name)
+        else:
+            tpDcc.ToolsMgr().launch_tool_by_id('tpRigToolkit-tools-rigbuilder', do_reload=False, debug=False)
