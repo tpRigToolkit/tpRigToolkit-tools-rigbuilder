@@ -493,7 +493,7 @@ class HubWidget(window.BaseWindow, object):
         if not rigs:
             self._update_rig(None)
             if self._project:
-                data_library.set_path(self._project.get_full_path())
+                data_library.set_path(self._project.full_path)
             else:
                 data_library.set_path(None)
             self._builder.set_rig(None)
@@ -585,7 +585,7 @@ class HubWidget(window.BaseWindow, object):
 
     def _on_puppet_removed(self):
         if self._project:
-            project_name = self._project.get_name()
+            project_name = self._project.name
             tpDcc.ToolsMgr().launch_tool_by_id(
                 'tpRigToolkit-tools-rigbuilder', do_reload=False, debug=False, project_name=project_name)
         else:

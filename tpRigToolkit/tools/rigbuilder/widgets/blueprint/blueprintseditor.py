@@ -145,7 +145,7 @@ class BlueprintsViewer(base.BaseWidget, object):
         if not hasattr(current, 'item_type') or not current.item_type == consts.DataTypes.Blueprint:
             if self._library:
                 if self._project:
-                    self._library.set_path(self._project.get_full_path())
+                    self._library.set_path(self._project.full_path)
                 else:
                     self._library.set_path(None)
             self._library.setEnabled(False)
@@ -196,14 +196,14 @@ class BlueprintsTree(QTreeWidget, object):
         if not self._project:
             return
 
-        project_path = self._project.get_full_path()
+        project_path = self._project.full_path
 
         builder_item = QTreeWidgetItem()
         builder_item.setText(0, 'RigBuilder')
         builder_item.setData(0, Qt.UserRole, helpers.BlueprintsHelpers.get_rigbuilder_blueprints_path())
         builder_item.item_type = 'root'
         project_item = QTreeWidgetItem()
-        project_item.setText(0, 'Project: {}'.format(self._project.get_name()))
+        project_item.setText(0, 'Project: {}'.format(self._project.name))
         project_item.setData(0, Qt.UserRole, project_path)
         project_item.item_type = 'root'
 

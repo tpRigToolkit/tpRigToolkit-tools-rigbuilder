@@ -588,7 +588,7 @@ class BlueprintsHelpers(ObjectsHelpers, object):
 
         blueprints_paths = [BlueprintsHelpers.get_rigbuilder_blueprints_path()]
         if project:
-            blueprints_paths.append(project.get_full_path())
+            blueprints_paths.append(project.full_path)
 
         return blueprints_paths
 

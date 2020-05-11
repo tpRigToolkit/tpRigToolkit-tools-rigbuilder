@@ -46,7 +46,7 @@ class DataLibrary(tool.DockTool, object):
             self._content_layout.addWidget(self._data_library)
             self._data_library.set_settings(settings)
             # self._data_library.set_theme(theme)
-            self._data_library.set_path(project.get_full_path())
+            self._data_library.set_path(project.full_path)
 
     def set_project(self, project):
         self._data_library.set_project(project)

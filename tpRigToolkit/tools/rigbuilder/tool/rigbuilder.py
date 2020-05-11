@@ -19,15 +19,14 @@ from Qt.QtWidgets import *
 from Qt.QtGui import *
 
 import logging
-from functools import partial
 
 import tpDcc
 from tpDcc.libs.python import path as path_utils
-from tpDcc.libs.qt.core import qtutils, window
+from tpDcc.libs.qt.core import window
 from tpDcc.libs.qt.widgets import stack, dividers
 
 from tpRigToolkit.tools import rigbuilder
-from tpRigToolkit.tools.rigbuilder.core import utils, tool
+from tpRigToolkit.tools.rigbuilder.core import utils
 from tpRigToolkit.tools.rigbuilder.widgets.hub import hub
 from tpRigToolkit.tools.rigbuilder.widgets.base import project, console
 
@@ -160,12 +159,12 @@ class RigBuilder(window.BaseWindow, object):
         self._console.setVisible(True)
         self._console_dock.setVisible(True)
         self._console.clear()
-        self._console.write('>> Opening Project: {} ...'.format(self._project.get_name()))
+        self._console.write('>> Opening Project: {} ...'.format(self._project.name))
         self._toolbar.setVisible(True)
         self.menuBar().setVisible(True)
         self._progress_toolbar.setVisible(False)
         self._stack.slide_in_index(1)
-        self._console.write_ok('>> Project {} opened successfully!'.format(self._project.get_name()))
+        self._console.write_ok('>> Project {} opened successfully!'.format(self._project.name))
 
     def _open_projects_widget(self):
         """
