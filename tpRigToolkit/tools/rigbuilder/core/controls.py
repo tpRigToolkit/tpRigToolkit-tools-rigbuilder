@@ -29,6 +29,6 @@ class RigBuilderControlLib(controllib.ControlLib, object):
         if not project:
             return
 
-        self.controls_file = os.path.join(project.get_full_path(), 'controls.json')
+        self.controls_file = os.path.join(project.full_path, 'controls.json')
 
         self.load_control_data()
