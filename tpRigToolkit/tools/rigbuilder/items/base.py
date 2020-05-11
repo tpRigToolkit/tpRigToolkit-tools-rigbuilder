@@ -13,21 +13,19 @@ from Qt.QtCore import *
 from Qt.QtWidgets import *
 from Qt.QtGui import *
 
-import tpDccLib as tp
-from tpPyUtils import decorators, path as path_utils
-from tpQtLib.widgets import treewidgets
-
-from tpRigToolkit.core import resource
+import tpDcc as tp
+from tpDcc.libs.python import decorators, fileio, path as path_utils
+from tpDcc.libs.qt.widgets import treewidgets
 
 LOGGER = logging.getLogger('tpRigToolkit')
 
 
 class BaseItem(treewidgets.TreeWidgetItem, object):
 
-    ok_icon = resource.ResourceManager().icon('ok')
-    warning_icon = resource.ResourceManager().icon('warning')
-    error_icon = resource.ResourceManager().icon('error')
-    wait_icon = resource.ResourceManager().icon('wait')
+    ok_icon = tp.ResourcesMgr().icon('ok')
+    warning_icon = tp.ResourcesMgr().icon('warning')
+    error_icon = tp.ResourcesMgr().icon('error')
+    wait_icon = tp.ResourcesMgr().icon('wait')
 
     def __init__(self, parent=None):
 
@@ -35,6 +33,7 @@ class BaseItem(treewidgets.TreeWidgetItem, object):
         self._object = None
         self._run_state = -1
         self._context_menu = None
+        self._handle_manifest = False
 
         super(BaseItem, self).__init__(parent)
 
@@ -49,6 +48,18 @@ class BaseItem(treewidgets.TreeWidgetItem, object):
                 self._radial_fill_icon(0, 0, 0)
 
         self._create_context_menu()
+
+    # ================================================================================================
+    # ======================== OVERRIDES
+    # ================================================================================================
+
+    @property
+    def handle_manifest(self):
+        return self._handle_manifest
+
+    @handle_manifest.setter
+    def handle_manifest(self, flag):
+        self._handle_manifest = flag
 
     # ================================================================================================
     # ======================== OVERRIDES
@@ -72,6 +83,34 @@ class BaseItem(treewidgets.TreeWidgetItem, object):
     #     """
     #
     #     return self.set_text(text)
+
+    def setData(self, column, role, value):
+        """
+        Overrides base QTreeWidgetItem setData function
+        :param column: int
+        :param role: QRole
+        :param value: variant
+        """
+
+        super(BaseItem, self).setData(column, role, value)
+
+        if value == 0 or value is False:
+            check_state = Qt.Unchecked
+        elif value == 2 or value is True:
+            check_state = Qt.Checked
+
+        if role == Qt.CheckStateRole:
+            if self._handle_manifest:
+                tree = self.treeWidget()
+                tree.update_scripts_manifest()
+                if tree._shift_activate:
+                    child_count = self.childCount()
+                    for i in range(child_count):
+                        child = self.child(i)
+                        child.setCheckedState(column, check_state)
+                        children = tree._get_ancestors(child)
+                        for child in children:
+                            child.setCheckedState(column, check_state)
 
     # ================================================================================================
     # ======================== BASE
@@ -104,6 +143,23 @@ class BaseItem(treewidgets.TreeWidgetItem, object):
         text = '   ' + text
         super(BaseItem, self).setText(0, text)
 
+    def get_name(self, keep_extension=False):
+        """
+        Returns item name
+        :param keep_extension: bool, Whether to return the path to the file with the file extension or not
+        :return: str
+        """
+
+        item_name = self.text(0)
+        if not keep_extension:
+            item_name = fileio.remove_extension(item_name)
+
+        item_path = self.get_path()
+        if item_path:
+            item_name = path_utils.join_path(item_path, item_name)
+
+        return item_name
+
     def get_path(self):
         """
         Returns the path to an item from the top tree level to down
@@ -118,7 +174,7 @@ class BaseItem(treewidgets.TreeWidgetItem, object):
             parent_name = parent_name.split('.')[0]
             if parent_path:
                 parent_path = path_utils.join_path(parent_name, parent_path)
-            else:
+            if not parent_path:
                 parent_path = parent_name
 
             parent = parent.parent()

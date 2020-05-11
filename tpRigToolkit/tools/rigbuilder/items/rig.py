@@ -9,7 +9,7 @@ from __future__ import print_function, division, absolute_import
 
 from Qt.QtCore import *
 
-from tpPyUtils import path as path_utils
+from tpDcc.libs.python import path as path_utils
 
 from tpRigToolkit.tools.rigbuilder.items import base
 from tpRigToolkit.tools.rigbuilder.objects import helpers, rig
@@ -72,6 +72,15 @@ class RigItem(base.BaseItem, object):
         rig = self._get_rig()
         if not rig:
             return
+
+        if hasattr(rig, 'filepath') and not rig.filepath:
+            return
+
+        if role == Qt.CheckStateRole:
+            if value == 0:
+                rig.set_enabled(False)
+            if value == 2:
+                rig.set_enabled(True)
 
     def create(self):
         """

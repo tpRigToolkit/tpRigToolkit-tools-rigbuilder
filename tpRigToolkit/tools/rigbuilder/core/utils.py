@@ -16,11 +16,9 @@ import os
 
 from Qt.QtWidgets import *
 
-import tpDccLib as tp
-from tpQtLib.widgets import messagebox
-from tpPyUtils import settings, osplatform, path as path_utils
-
-import tpRigToolkit
+import tpDcc as tp
+from tpDcc.libs.python import settings, osplatform, path as path_utils
+from tpDcc.libs.qt.widgets import messagebox
 
 
 def show_rename_dialog(title, message, input_text):
@@ -28,7 +26,7 @@ def show_rename_dialog(title, message, input_text):
     Shows the rename dialog
     """
 
-    tool_info = tpRigToolkit.ToolsMgr().get_tool_data_from_id('tpRigToolkit-tools-rigbuilder')
+    tool_info = tp.ToolsMgr().get_plugin_data_from_id('tpRigToolkit-tools-rigbuilder')
     if not tool_info or not tool_info.get('attacher', None):
         name, btn = messagebox.MessageBox.input(None, title, message, input_text=input_text)
     else:
@@ -49,7 +47,7 @@ def show_question_dialog(title, text):
     :return: QMessageBox.StandardButton
     """
 
-    tool_info = tpRigToolkit.ToolsMgr().get_tool_data_from_id('tpRigToolkit-tools-rigbuilder')
+    tool_info = tp.ToolsMgr().get_plugin_data_from_id('tpRigToolkit-tools-rigbuilder')
     if not tool_info or not tool_info.get('attacher', None):
         return messagebox.MessageBox.question(None, title, text)
     else:
@@ -106,3 +104,19 @@ def get_data_files_directory():
         data_directories.append(utils.get_data_files_directory())
 
     return data_directories
+
+
+def get_script_files_directory():
+    """
+    Returns path where script files for tpRigToolkit.tools.rigbuilder are located
+    :return: str
+    """
+
+    # TODO: We should add here the option to add data files from project also
+
+    script_directories = [os.path.join(get_rig_builder_directory(), 'scripts')]
+    if tp.is_maya():
+        from tpRigToolkit.tools.rigbuilder.dccs.maya.core import utils
+        script_directories.append(utils.get_script_files_directory())
+
+    return script_directories
