@@ -9,9 +9,8 @@ from __future__ import print_function, division, absolute_import
 
 from Qt.QtWidgets import *
 
-from tpQtLib.core import tool
-
-from tpRigToolkit.tools.rigbuilder.widgets import nodestree
+from tpRigToolkit.tools.rigbuilder.core import tool
+from tpRigToolkit.tools.rigbuilder.widgets.base import nodestree
 
 
 class BuldNodesLibrary(tool.DockTool, object):

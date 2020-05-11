@@ -10,9 +10,9 @@ from __future__ import print_function, division, absolute_import
 from Qt.QtCore import *
 from Qt.QtWidgets import *
 
-from tpQtLib.core import tool
+from tpDcc.libs.qt.widgets import options
 
-from tpRigToolkit.tools.rigbuilder.widgets import properties
+from tpRigToolkit.tools.rigbuilder.core import tool
 
 
 class PropertiesTool(tool.DockTool, object):
@@ -44,28 +44,20 @@ class PropertiesTool(tool.DockTool, object):
 
     def _create_ui(self):
 
-        self._scroll_area = QScrollArea(self)
-        self._scroll_area.setWidgetResizable(True)
-        self._properties_widget = properties.PropertiesWidget()
-        self._scroll_area.setWidget(self._properties_widget)
-        self._properties_widget._search_layout.removeWidget(self._properties_widget._lock_btn)
-        # self.add_button(self._properties_widget._lock_btn)
-        self._properties_widget._search_layout.removeWidget(self._properties_widget._tear_off_btn)
-        # self.add_button(self._properties_widget._tear_off_btn)
-        self._content_layout.addWidget(self._scroll_area)
+        self._options_widget = options.OptionsWidget()
+        self._options_widget.hide_edit_widget()
+        self._content_layout.addWidget(self._options_widget)
 
     def clear(self):
-        self._properties_widget.clear()
+        self._options_widget.clear_options()
 
     def refresh(self):
-        print('refreshgigigigigigi')
-
-    def assign_properties_widget(self, properties_fill_delegate):
-        self._fill_delegate = properties_fill_delegate
-        properties_fill_delegate(self._properties_widget)
+        self._options_widget.get_option_object().load_options()
+        self._options_widget.update_options()
 
     def set_project(self, project):
         pass
 
     def set_object(self, object):
-        pass
+        self._options_widget.set_option_object(object)
+        self.refresh()

@@ -10,9 +10,8 @@ from __future__ import print_function, division, absolute_import
 from Qt.QtCore import *
 from Qt.QtWidgets import *
 
-from tpQtLib.core import tool
-
-from tpRigToolkit.tools.rigbuilder.widgets import datalibrary
+from tpRigToolkit.tools.rigbuilder.core import tool
+from tpRigToolkit.tools.rigbuilder.widgets.base import datalibrary
 
 
 class DataLibrary(tool.DockTool, object):
@@ -38,7 +37,7 @@ class DataLibrary(tool.DockTool, object):
 
         project = self._app.get_project()
         settings = self._app.settings()
-        theme = self._app.theme()
+        # theme = self._app.theme()
 
         if not self._data_library:
             console = self._app.get_console()
@@ -46,7 +45,7 @@ class DataLibrary(tool.DockTool, object):
             self._data_library.setMinimumWidth(400)
             self._content_layout.addWidget(self._data_library)
             self._data_library.set_settings(settings)
-            self._data_library.set_theme(theme)
+            # self._data_library.set_theme(theme)
             self._data_library.set_path(project.get_full_path())
 
     def set_project(self, project):

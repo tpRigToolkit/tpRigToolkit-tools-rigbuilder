@@ -10,10 +10,9 @@ from __future__ import print_function, division, absolute_import
 from Qt.QtCore import *
 from Qt.QtWidgets import *
 
-from tpQtLib.core import tool
-from tpQtLib.widgets import stack
+from tpDcc.libs.qt.widgets import stack
 
-from tpRigToolkit.tools.rigbuilder.core import consts
+from tpRigToolkit.tools.rigbuilder.core import consts, tool
 from tpRigToolkit.tools.rigbuilder.objects import helpers
 
 

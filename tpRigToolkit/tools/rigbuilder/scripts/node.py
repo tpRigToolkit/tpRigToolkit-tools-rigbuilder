@@ -10,8 +10,8 @@ from __future__ import print_function, division, absolute_import
 import os
 import logging
 
-from tpPyUtils import yamlio, path as path_utils
-from tpDccLib.core import data
+from tpDcc.core import data
+from tpDcc.libs.python import yamlio, path as path_utils
 
 from tpRigToolkit.tools.rigbuilder.core import consts
 
