@@ -13,9 +13,10 @@ __maintainer__ = "Tomas Poveda"
 __email__ = "tpovedatd@gmail.com"
 
 import os
+import string
 import logging
 
-from tpPyUtils import folder, settings, version, path as path_utils
+from tpDcc.libs.python import folder, settings, version, path as path_utils
 
 from tpRigToolkit.tools.rigbuilder.core import consts, utils, data
 from tpRigToolkit.tools.rigbuilder.objects import helpers
@@ -28,6 +29,7 @@ class BaseObject(object):
     DESCRIPTION = 'base'
     DATA_FOLDER_NAME = consts.DATA_FOLDER
     DATA_FILE_NAME = consts.DATA_FILE
+    SUB_DATA_FOLDER_NAME = consts.SUB_DATA_FOLDER
     BACKUP_FOLDER = consts.BACKUP_FOLDER
     VERSION_NAME = consts.VERSION_NAME
     SETTINGS_FILE_NAME = consts.SETTINGS_FILE_NAME
@@ -42,10 +44,9 @@ class BaseObject(object):
 
         self._name = name
         self._directory = folder.get_current_working_directory()
-        self._settings = None
-        self._library = None
-        self._option_settings = None
-        self._option_values = dict()
+
+        self._reset()
+
 
     # ================================================================================================
     # ======================== STATIC / CLASS
@@ -103,6 +104,7 @@ class BaseObject(object):
         """
 
         self._directory = directory
+        self._reset()
 
     def get_path(self):
         """
@@ -110,8 +112,12 @@ class BaseObject(object):
         :return: str
         """
 
+        if not self._directory:
+            return
+
         if self._name:
-            return path_utils.join_path(self._directory, self._name)
+            item_name = self._name.split('/')[-1]
+            return path_utils.join_path(self._directory, item_name)
         else:
             return self._directory
 
@@ -198,16 +204,28 @@ class BaseObject(object):
             dir_name = path_utils.get_dirname(self._directory)
             folder.delete_folder(basename, dir_name)
 
+    def setup_context_menu(self, menu):
+        """
+        Updates given context menu with custom actions for this object
+        Overrides in specific BuildObjects implementations
+        :param menu: QMenu
+        """
+
+        pass
+
     # ================================================================================================
     # ======================== CREATE / LOAD
     # ================================================================================================
 
-    def load(self, *args, **kwargs):
+    def load(self, name):
         """
         Loads the given build object into the instance
         """
 
-        self._refresh()
+        self._set_name(name)
+        self._reset()
+
+        # self._refresh()
 
     def sync(self):
         """
@@ -234,7 +252,10 @@ class BaseObject(object):
         :return: str
         """
 
-        return self._get_path(self.DATA_FOLDER_NAME)
+        if not self._data_override:
+            return self._get_path(self.DATA_FOLDER_NAME)
+        else:
+            return self._data_override._get_path(self.DATA_FOLDER_NAME)
 
     def is_data_folder(self, name, sub_folder=None):
         """
@@ -289,8 +310,8 @@ class BaseObject(object):
         :return: str, name of the data type of the data folder (if exists)
         """
 
-        data_folder = data.DataFolder(name=name, file_path=self.get_data_path(),
-                                      data_path=utils.get_data_files_directory())
+        data_folder = data.ScriptFolder(
+            name=name, file_path=self.get_data_path(), data_path=utils.get_data_files_directory())
         data_type = data_folder.get_data_type()
 
         return data_type
@@ -305,7 +326,7 @@ class BaseObject(object):
         """
 
         data_path = self.get_data_path()
-        data_folder = data.DataFolder(name, data_path, data_path=utils.get_data_files_directory())
+        data_folder = data.ScriptFolder(name, data_path, data_path=utils.get_data_files_directory())
         inst = data_folder.get_folder_data_instance()
         if not inst:
             return
@@ -321,7 +342,8 @@ class BaseObject(object):
         """
 
         data_path = self.get_data_path()
-        data_folder = data.DataFolder(name=name, file_path=data_path, data_path=utils.get_data_files_directory())
+        data_folder = data.ScriptFolder(
+            name=name, file_path=data_path, data_path=utils.get_data_files_directory())
 
         return data_folder.get_folder_data_instance()
 
@@ -342,7 +364,8 @@ class BaseObject(object):
             test_path = path_utils.unique_path_name(test_path)
         name = path_utils.get_basename(test_path)
 
-        data_folder = data.DataFolder(name=name, file_path=data_path, data_path=utils.get_data_files_directory())
+        data_folder = data.ScriptFolder(
+            name=name, file_path=data_path, data_path=utils.get_data_files_directory())
         data_folder.set_data_type(data_type)
         return_path = data_folder.folder_path
 
@@ -355,6 +378,18 @@ class BaseObject(object):
             return_path = folder.create_folder(sub_folder_path)
 
         return return_path
+
+    def get_data_versions(self, data_name):
+        """
+        Returns available version of the given data
+        :param data_name: str
+        :return: list(str)
+        """
+
+        data_folder = self.get_data_file_or_folder(data_name)
+        data_version = version.VersionFile(data_folder)
+
+        return len(data_version.get_version_numbers())
 
     def get_data_sub_path(self, name):
         """
@@ -414,7 +449,7 @@ class BaseObject(object):
         """
 
         data_folder = data.ScriptFolder(
-            name=name, file_path=self.get_data_path(), data_path=tpRigBuilder.get_data_files_directory())
+            name=name, file_path=self.get_data_path(), data_path=utils.get_data_files_directory())
         data_type = data_folder.get_data_type()
         sub_folder = data_folder.get_sub_folder()
 
@@ -462,6 +497,17 @@ class BaseObject(object):
         target_file = self.get_data_file_or_folder(data_name, sub_folder_name)
 
         helpers.ObjectsHelpers.copy(source_file, target_file)
+
+    def remove_data_versions(self, name, sub_folder=None, keep=1):
+        """
+        Removes data versions
+        :param name: str
+        :param sub_folder: bool
+        :param keep: int
+        """
+
+        folder = self.get_data_folder(name, sub_folder)
+        version.delete_versions(folder, keep)
 
     def open_data(self, name, sub_folder=None):
         """
@@ -721,6 +767,12 @@ class BaseObject(object):
             value = [value, 'script']
         elif option_type == 'dictionary':
             value = [value, 'dictionary']
+        elif option_type == 'nonedittext':
+            value = [value, 'nonedittext']
+        elif option_type == 'directory':
+            value = [value, 'directory']
+        elif option_type == 'file':
+            value = [value, 'file']
 
         self._option_settings.set(name, value)
 
@@ -829,6 +881,26 @@ class BaseObject(object):
     # ======================== INTERNAL
     # ================================================================================================
 
+    def _set_name(self, new_name):
+        """
+        Internal function used to set the name of the rig
+        :param new_name: str, new task name
+        """
+
+        new_name = new_name.strip()
+        self._name = new_name
+
+    def _reset(self):
+        """
+        Internal function resets object variables
+        """
+
+        self._settings = None
+        self._library = None
+        self._option_settings = None
+        self._option_values = dict()
+        self._data_override = None
+
     def _get_invalid_code_names(self):
         """
         Internal function that returns a list not valid code names
@@ -846,14 +918,6 @@ class BaseObject(object):
         raise NotImplementedError(
             '_create_folder function for "{}" is not implemented!'.format(self.__class__.__name__))
 
-    def _refresh(self):
-        """
-        Internal function that is called when object is loaded
-        """
-
-        self._setup_options()
-        self._setup_settings()
-
     def _get_path(self, name):
         """
         Internal function used to return the path with given name inside the rig folder
@@ -862,6 +926,17 @@ class BaseObject(object):
         """
 
         return path_utils.join_path(self.get_path(), name)
+
+    def _get_override_path(self):
+        """
+        Returns override path
+        :return: str
+        """
+
+        if not self._data_override:
+            return self.get_path()
+        else:
+            return self._data_override.get_path()
 
     def _get_folders_without_prefix_suffix(self, directory, recursive=False, base_directory=None):
         """
@@ -905,9 +980,8 @@ class BaseObject(object):
 
         if not self._settings:
             self._settings = settings.JSONSettings()
-
-        self._settings.set_directory(
-            self.get_path(), '{}.{}'.format(self.SETTINGS_FILE_NAME, self.SETTINGS_FILE_EXTENSION))
+            self._settings.set_directory(
+                self._get_override_path(), '{}.{}'.format(self.SETTINGS_FILE_NAME, self.SETTINGS_FILE_EXTENSION))
 
     def _setup_options(self):
         """
@@ -916,9 +990,8 @@ class BaseObject(object):
 
         if not self._option_settings:
             self._option_settings = settings.JSONSettings()
-
-        self._option_settings.set_directory(
-            self.get_path(), '{}.{}'.format(self.OPTIONS_FILE_NAME, self.OPTIONS_FILE_EXTENSION))
+            self._option_settings.set_directory(
+                self._get_override_path(), '{}.{}'.format(self.OPTIONS_FILE_NAME, self.OPTIONS_FILE_EXTENSION))
 
     def _format_option_value(self, value):
         """
@@ -928,27 +1001,35 @@ class BaseObject(object):
         """
 
         new_value = value
+        option_type = None
         if type(value) == list:
-            option_type = value[1]
+            try:
+                option_type = value[1]
+            except Exception:
+                pass
             value = value[0]
             if option_type == 'dictionary':
                 new_value = value[0]
                 if type(new_value) == list:
                     new_value = new_value[0]
-        if type(value) == str or type(value) in [unicode, str]:
-            eval_value = None
-            try:
-                if value:
-                    eval_value = eval(value)
-            except Exception:
-                pass
-            if eval_value:
-                if type(eval_value) in [list, tuple, dict]:
-                    new_value = eval_value
-                    value = eval_value
-        if type(value) in [str, unicode]:
-            if value.find(',') > -1:
-                new_value = value.split(',')
+
+        if not option_type == 'script':
+            if type(value) == str or type(value) in [unicode, str]:
+                eval_value = None
+                try:
+                    if value:
+                        eval_value = eval(value)
+                except Exception:
+                    pass
+                if eval_value:
+                    if type(eval_value) in [list, tuple, dict]:
+                        new_value = eval_value
+                        value = eval_value
+            if type(value) in [str, unicode]:
+                if value.find(',') > -1:
+                    new_value = value.split(',')
+
+        LOGGER.debug('Formatted value: {}'.format(new_value))
 
         return new_value
 
@@ -982,3 +1063,52 @@ class BaseObject(object):
         inst = data_folder.get_folder_data_instance()
 
         return inst, current_sub_folder
+
+    def _get_relative_object_path(self, relative_path, from_override=False):
+        """
+        Returns relative rig path
+        :param relative_path: str
+        :param from_override: boiol
+        :return: str
+        """
+
+        if not from_override:
+            object_path = self.get_path()
+        else:
+            object_path = self._get_override_path()
+        if not object_path:
+            return None, None
+
+        split_path = self.get_path().split('/')
+        split_relative_path = relative_path.split('/')
+        up_directory = 0
+        new_sub_path = list()
+        new_path = list()
+        for sub_path in split_relative_path:
+            if sub_path == '..':
+                up_directory += 1
+            else:
+                new_sub_path.append(sub_path)
+
+        if up_directory:
+            new_path = split_path[:-up_directory]
+            new_path += new_sub_path
+        if up_directory == 0:
+            new_path = split_path + split_relative_path
+            new_path_test = string.join(new_path, '/')
+            if not path_utils.is_dir(new_path_test):
+                temp_split_path = list(split_path)
+                temp_split_path.reverse()
+                found_path = list()
+                for i in range(len(temp_split_path)):
+                    if temp_split_path[i] == split_relative_path[0]:
+                        found_path = temp_split_path[i + 1:]
+                found_path.reverse()
+                new_path = found_path + split_relative_path
+
+        object_name = string.join([new_path[-1]], '/')
+        object_directory = string.join(new_path[:-1], '/')
+
+        LOGGER.debug('Relative object name: {} and path {}'.format(object_name, object_directory))
+
+        return object_name, object_directory

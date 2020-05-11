@@ -14,8 +14,8 @@ __email__ = "tpovedatd@gmail.com"
 
 import os
 
-from tpPyUtils import decorators
-from tpRigToolkit.tools.controlrig.core import controllib
+from tpDcc.libs.python import decorators
+from tpRigToolkit.libs.controlrig.core import controllib
 
 from tpRigToolkit.tools import rigbuilder
 

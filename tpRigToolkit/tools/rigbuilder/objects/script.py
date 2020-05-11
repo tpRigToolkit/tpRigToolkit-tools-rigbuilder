@@ -12,13 +12,15 @@ __license__ = "MIT"
 __maintainer__ = "Tomas Poveda"
 __email__ = "tpovedatd@gmail.com"
 
+import sys
 import string
 import logging
 import traceback
 
-import tpDccLib as tp
-from tpDccLib.core import scripts
-from tpPyUtils import log, osplatform, python, folder, fileio, timers, version, path as path_utils, name as name_utils
+import tpDcc as tp
+from tpDcc.core import scripts
+from tpDcc.libs.python import log, osplatform, python, folder, fileio, timers, version
+from tpDcc.libs.python import path as path_utils, name as name_utils
 
 from tpRigToolkit.tools.rigbuilder.core import consts, utils, data
 from tpRigToolkit.tools.rigbuilder.objects import helpers, base
@@ -41,11 +43,11 @@ class ScriptObject(base.BaseObject, object):
     DESCRIPTION = 'script'
 
     def __init__(self, name=None):
-        super(ScriptObject, self).__init__(name=name)
 
         self._external_code_paths = list()
-        self._runtime_values = dict()
-        self._runtime_globals = dict()
+        self._update_options = True
+
+        super(ScriptObject, self).__init__(name=name)
 
     # ================================================================================================
     # ======================== OVERRIDES
@@ -64,13 +66,15 @@ class ScriptObject(base.BaseObject, object):
 
         return True
 
-    def _refresh(self):
+    def _reset(self):
         """
-        Internal function that is called when object is loaded
+        Internal function resets object variables
         """
 
-        super(ScriptObject, self)._refresh()
+        super(ScriptObject, self)._reset()
+
         self._runtime_values = dict()
+        self._runtime_globals = dict()
 
     def _get_invalid_code_names(self):
         """
@@ -78,7 +82,11 @@ class ScriptObject(base.BaseObject, object):
         :return: list(str)
         """
 
-        return ['{}.{}'.format(self.MANIFEST_FILE, self.SCRIPT_EXTENSION)]
+        extension = self.SCRIPT_EXTENSION
+        if not extension.startswith('.'):
+            extension = '.{}'.format(extension)
+
+        return ['{}{}'.format(self.MANIFEST_FILE, extension)]
 
     def _create_folder(self):
         """
@@ -116,10 +124,14 @@ class ScriptObject(base.BaseObject, object):
         if not script_count and not code_folders:
             return
 
+        extension = self.SCRIPT_EXTENSION
+        if not extension.startswith('.'):
+            extension = '.{}'.format(extension)
+
         if script_count:
             for i in range(script_count):
                 script_name = fileio.remove_extension(scripts_list[i])
-                script_path = self.get_code_file(script_name)
+                script_path = self._get_code_file(script_name)
                 if not path_utils.is_file(script_path):
                     LOGGER.warning('Script "{}" does not exists in proper path: {}'.format(script_name, script_path))
                     continue
@@ -135,25 +147,26 @@ class ScriptObject(base.BaseObject, object):
                 for i in range(len(code_folders)):
                     if code_folders[i] == script_name:
                         remove_index = i
+                        break
                     if code_folders in synced_scripts:
                         if not code_folders[i].count('/'):
                             continue
                         common_path = path_utils.get_common_path(code_folders[i], script_name)
                         if common_path:
-                            common_path_name = common_path + '.{}'.format(self.SCRIPT_EXTENSION)
+                            common_path_name = common_path + extension
                             if common_path_name in synced_scripts:
-                                code_script = code_folders[i] + '.{}'.format(self.SCRIPT_EXTENSION)
+                                code_script = code_folders[i] + extension
                                 synced_scripts.append(code_script)
                                 synced_states.append(False)
                                 remove_index = i
+                                break
                 if remove_index:
                     code_folders.pop(remove_index)
 
         for code_folder in code_folders:
-            code_folder += '.{}'.format(self.SCRIPT_EXTENSION)
-            if code_folder not in synced_scripts:
-                synced_scripts.append(code_folder)
-                synced_states.append(False)
+            code_folder += extension
+            synced_scripts.append(code_folder)
+            synced_states.append(False)
 
         self.set_scripts_manifest(scripts_to_add=synced_scripts, states=synced_states)
 
@@ -220,7 +233,7 @@ class ScriptObject(base.BaseObject, object):
 
         return self._runtime_values
 
-    def run_script(self, script, hard_error=True, settings=None):
+    def run_script(self, script, hard_error=True, settings=None, **kwargs):
         """
         Runs a script in the rig
         :param script: str, name of the script in the rig we want to execute
@@ -229,6 +242,10 @@ class ScriptObject(base.BaseObject, object):
         :param settings:
         :return: str, status from running the script (including error messages)
         """
+
+        if self._update_options:
+            self._option_settings = None
+            self._setup_options()
 
         tp.Dcc.clear_selection()
         tp.Dcc.refresh_viewport()
@@ -239,15 +256,15 @@ class ScriptObject(base.BaseObject, object):
 
         log.start_temp_log(LOGGER.name)
 
-        self._reset_builtin()
+        self._reset_builtin(**kwargs)
         tp.Dcc.enable_undo()
 
         try:
             if not path_utils.is_file(script):
                 script = fileio.remove_extension(script)
-                script = self.get_code_file(script)
+                script = self._get_code_file(script)
             if not path_utils.is_file(script):
-                self._reset_builtin()
+                self._reset_builtin(**kwargs)
                 LOGGER.warning('Could not find script: {}'.format(orig_script))
                 return
             auto_focus = False
@@ -267,14 +284,14 @@ class ScriptObject(base.BaseObject, object):
             LOGGER.info('\n------------------------------------------------')
             LOGGER.debug('START\t{}\n\n'.format(basename))
 
-            module, init_passed, status = self._source_script(script)
+            module, init_passed, status = self._source_script(script, **kwargs)
         except Exception:
             LOGGER.warning('{} did not source!'.format(script))
             status = traceback.format_exc()
             init_passed = False
             if hard_error:
                 tp.Dcc.disable_undo()
-                self._reset_builtin()
+                self._reset_builtin(**kwargs)
                 try:
                     del module
                 except Exception:
@@ -289,7 +306,7 @@ class ScriptObject(base.BaseObject, object):
                     status = ScriptStatus.SUCCESS
             except Exception:
                 status = traceback.format_exc()
-                self._reset_builtin()
+                self._reset_builtin(**kwargs)
                 if hard_error:
                     tp.Dcc.disable_undo()
                     LOGGER.error('{}\n'.format(status))
@@ -298,7 +315,7 @@ class ScriptObject(base.BaseObject, object):
         tp.Dcc.disable_undo()
 
         del module
-        self._reset_builtin()
+        self._reset_builtin(**kwargs)
 
         if not status == ScriptStatus.SUCCESS:
             LOGGER.debug('{}\n'.format(status))
@@ -308,7 +325,7 @@ class ScriptObject(base.BaseObject, object):
 
         return status
 
-    def run(self, start_new=False):
+    def run(self, start_new=False, **kwargs):
         """
         Run all the scripts in the script manifest (taking into account their on/off state)
         """
@@ -326,7 +343,7 @@ class ScriptObject(base.BaseObject, object):
 
         manage_node_editor_inst = None
         if tp.is_maya():
-            from tpMayaLib.core import gui
+            from tpDcc.dccs.maya.core import gui
             manage_node_editor_inst = gui.ManageNodeEditors()
             if start_new:
                 tp.Dcc.new_file(force=True)
@@ -379,7 +396,7 @@ class ScriptObject(base.BaseObject, object):
                     continue
 
                 try:
-                    status = self.run_script(script, hard_error=False)
+                    status = self.run_script(script, hard_error=False, **kwargs)
                 except Exception as exc:
                     LOGGER.error('Error while executing script: {} | {}'.format(exc, traceback.format_exc()))
                     status = ScriptStatus.FAIL
@@ -815,21 +832,12 @@ class ScriptObject(base.BaseObject, object):
         :return: str
         """
 
-        code_file = path_utils.join_path(self.get_code_path(), name)
-        if not path_utils.is_dir(code_file):
+        code_file = self._get_code_file(name=name, basename=basename)
+        if not path_utils.exists(code_file):
             LOGGER.warning('Code File: "{}" does not exists!'.format(code_file))
             return
 
-        code_name = path_utils.get_basename(code_file)
-        if code_name == self.MANIFEST_FILE:
-            code_name += '.{}'.format(scripts.ScriptManifestData.get_data_extension())
-        else:
-            code_name += '.{}'.format(self.SCRIPT_EXTENSION)
-
-        if not basename:
-            code_name = path_utils.join_path(code_file, code_name)
-
-        return code_name
+        return code_file
 
     def get_code_name_from_path(self, code_path):
         """
@@ -925,7 +933,7 @@ class ScriptObject(base.BaseObject, object):
         new_path = path_utils.join_path(code_path, new_name)
         basename = path_utils.get_basename(new_name)
         dir_name = path_utils.get_dirname(new_name)
-        test_path = new_name
+        test_path = new_path
 
         if path_utils.is_dir(test_path):
             last_number = 1
@@ -937,14 +945,16 @@ class ScriptObject(base.BaseObject, object):
                 test_path = path_utils.join_path(code_path, new_name)
                 last_number += 1
 
-        folder.move_folder(old_path, new_path)
+        folder.move_folder(old_path, test_path)
         file_name = new_name
         old_basename = path_utils.get_basename(old_name)
         new_basename = path_utils.get_basename(new_name)
 
-        update_path = path_utils.join_path(
-            test_path, old_basename + '.{}'.format(self.SCRIPT_EXTENSION))
-        folder.rename_folder(update_path, new_basename+'.{}'.format(self.SCRIPT_EXTENSION))
+        script_extension = self.SCRIPT_EXTENSION
+        if not script_extension.startswith('.'):
+            script_extension = '.{}'.format(script_extension)
+        update_path = path_utils.join_path(test_path, old_basename + script_extension)
+        folder.rename_folder(update_path, new_basename + script_extension)
 
         return file_name
 
@@ -969,7 +979,10 @@ class ScriptObject(base.BaseObject, object):
         code_folder = data.ScriptFolder(old_name, self.get_code_path())
         code_folder.rename(sub_new_name)
 
-        code_name = new_name + '.py'
+        script_extension = self.SCRIPT_EXTENSION
+        if not script_extension.startswith('.'):
+            script_extension = '.{}'.format(script_extension)
+        code_name = new_name + script_extension
 
         return code_name
 
@@ -985,14 +998,38 @@ class ScriptObject(base.BaseObject, object):
     # ======================== INTERNAL
     # ================================================================================================
 
-    def _reset_builtin(self):
+    def _get_code_file(self, name, basename=False):
+        """
+        Returns path to code file with the given name in the current object code folder
+        :param name: str, name of the script we want to get
+        :param basename: bool, Whether to return full path of code file or only the code file name
+        :return: str
+        """
+
+        code_file = path_utils.join_path(self.get_code_path(), name)
+        code_name = path_utils.get_basename(code_file)
+        if code_name == self.MANIFEST_FILE:
+            extension = scripts.ScriptManifestData.get_data_extension()
+        else:
+            extension = self.SCRIPT_EXTENSION
+        if not extension.startswith('.'):
+            extension = '.{}'.format(extension)
+
+        code_name += extension
+
+        if not basename:
+            code_name = path_utils.join_path(code_file, code_name)
+
+        return code_name
+
+    def _reset_builtin(self, **kwargs):
         """
         Internal function used to reset current builtin variables
         """
 
-        helpers.ScriptHelpers.reset_code_bultins(self)
+        helpers.ScriptHelpers.reset_code_bultins(self, **kwargs)
 
-    def _source_script(self, script):
+    def _source_script(self, script, **kwargs):
         """
         Internal function that source the given script
         :param script: str, script in task we want to source
@@ -1000,8 +1037,8 @@ class ScriptObject(base.BaseObject, object):
         """
 
         python.delete_pyc_file(script)
-        self._reset_builtin()
-        helpers.ScriptHelpers.setup_code_builtins(self)
+        self._reset_builtin(**kwargs)
+        helpers.ScriptHelpers.setup_code_builtins(self, **kwargs)
 
         LOGGER.info('Sourcing: {}'.format(script))
 

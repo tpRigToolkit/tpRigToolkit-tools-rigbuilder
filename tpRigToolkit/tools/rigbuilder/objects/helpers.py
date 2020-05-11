@@ -17,8 +17,9 @@ import string
 import logging
 import __builtin__      # Not remove because its used to clean rig script builtins
 
-import tpDccLib as tp
-from tpPyUtils import osplatform, folder, fileio, yamlio, jsonio, version, path as path_utils
+import tpDcc as tp
+from tpDcc.libs.python import osplatform, folder, fileio, yamlio, version, log, path as path_utils
+from tpDcc.core import scripts
 
 from tpRigToolkit.tools.rigbuilder.core import consts, utils
 
@@ -147,31 +148,34 @@ class ObjectsHelpers(object):
 class ScriptHelpers(ObjectsHelpers, object):
 
     @staticmethod
-    def get_code_builtins(build_object):
+    def get_code_builtins(build_object, rig_object=None, character_object=None):
         """
         Returns all current code builtins of the given script object
         :param build_object: BuildObject
         :return: dict
         """
 
-        builtins = {'build': build_object, 'show': ObjectsHelpers.show, 'warning': ObjectsHelpers.warning}
+        builtins = {
+            'node': build_object, 'show': ObjectsHelpers.show, 'warning': ObjectsHelpers.warning,
+            'error': ObjectsHelpers.error, 'rig': rig_object, 'character': character_object}
         if tp.is_maya():
             import maya.cmds as cmds
-            import pymel.all as pymel
-            maya_builtins = {'cmds': cmds, 'mc': cmds, 'pymel': pymel, 'pm': pymel}
+            # import pymel.all as pymel
+            # maya_builtins = {'cmds': cmds, 'mc': cmds, 'pymel': pymel, 'pm': pymel}
+            maya_builtins = {'cmds': cmds, 'mc': cmds}
             for builtin in maya_builtins:
                 builtins[builtin] = maya_builtins[builtin]
 
         return builtins
 
     @staticmethod
-    def setup_code_builtins(script_object):
+    def setup_code_builtins(script_object, **kwargs):
         """
         Setup given rig builtins
         :param script_object: ScriptObject
         """
 
-        builtins = ScriptHelpers.get_code_builtins(script_object)
+        builtins = ScriptHelpers.get_code_builtins(script_object, **kwargs)
         for builtin in builtins:
             try:
                 exec ('del(__builtin__.%s)' % builtin)
@@ -181,13 +185,15 @@ class ScriptHelpers(ObjectsHelpers, object):
             exec '__builtin__.%s = builtin_value' % builtin
 
     @staticmethod
-    def reset_code_bultins(script_object):
+    def reset_code_bultins(script_object, rig_object=None, character_object=None):
         """
         Reset given rig builtins
         :param script_object: ScriptObject
+        :param character_object: ScriptObject
         """
 
-        builtins = ScriptHelpers.get_code_builtins(script_object)
+        builtins = ScriptHelpers.get_code_builtins(
+            script_object, rig_object=rig_object, character_object=character_object)
         for builtin in builtins:
             try:
                 exec ('del(__builtin__.{}'.format(builtin))
@@ -319,7 +325,7 @@ class RigHelpers(ScriptHelpers, object):
             parent = target_rig.get_parent_rig()
             if parent:
                 if parent.get_path() == source_rig.get_path():
-                    error('Cannot paste parent under child!')
+                    ObjectsHelpers.error('Cannot paste parent under child!')
                     return
 
         sub_folders = source_rig.get_sub_rigs()
@@ -331,7 +337,8 @@ class RigHelpers(ScriptHelpers, object):
             target_rig.set_library(source_rig.library())
 
         if not osplatform.get_permission(target_rig.get_path()):
-            warning('Could not get permission in directory: {} Copy operation aborted!'.format(target_rig.get_path()))
+            ObjectsHelpers.warning(
+                'Could not get permission in directory: {} Copy operation aborted!'.format(target_rig.get_path()))
             return
 
         if source_rig._name == target_rig._name and source_rig._directory == target_rig._directory:
@@ -356,7 +363,7 @@ class RigHelpers(ScriptHelpers, object):
             scripts_manifest_found = True
 
         for code_folder in code_folders:
-            copy_rig_code(source_rig, new_rig, code_folder)
+            RigHelpers.copy_rig_code(source_rig, new_rig, code_folder)
 
         for sub_folder in sub_folders:
             sub_rig = new_rig.get_sub_rig(sub_folder)
@@ -388,7 +395,7 @@ class RigHelpers(ScriptHelpers, object):
             return
 
         if source_rig._name == target_rig._name and source_rig._directory == target_rig._directory:
-            warning('Source and target rigs are the same. Skipping merge.')
+            ObjectsHelpers.warning('Source and target rigs are the same. Skipping merge.')
             return
 
         sub_folders = source_rig.get_sub_rigs()

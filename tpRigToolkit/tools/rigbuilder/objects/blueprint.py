@@ -15,8 +15,8 @@ __email__ = "tpovedatd@gmail.com"
 import os
 import logging
 
-from tpDccLib.core import scripts
-from tpPyUtils import jsonio, folder, path as path_utils
+from tpDcc.core import scripts
+from tpDcc.libs.python import jsonio, folder, path as path_utils
 
 from tpRigToolkit.tools.rigbuilder.core import consts
 from tpRigToolkit.tools.rigbuilder.objects import script
