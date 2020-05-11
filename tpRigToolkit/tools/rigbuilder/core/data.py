@@ -12,15 +12,15 @@ import os
 from Qt.QtCore import *
 from Qt.QtWidgets import *
 
-from tpPyUtils import path as path_utils
-
-from tpQtLib.core import qtutils
-from tpQtLib.widgets.library import manager
-
-from tpQtLib.widgets.library import items, loadwidget
+import tpDcc
+from tpDcc.libs.python import path as path_utils
+from tpDcc.libs.qt.core import qtutils
+from tpDcc.libs.qt.widgets.library import manager, items, loadwidget
 
 from tpRigToolkit.tools import rigbuilder
 from tpRigToolkit.tools.rigbuilder.core import utils
+
+LOGGER = tpDcc.LogsMgr().get_logger('tpRigToolkit-tools-rigbuilder')
 
 
 class ScriptFolder(manager.LibraryDataFolder, object):
@@ -112,6 +112,7 @@ class DataPreviewWidget(loadwidget.LoadWidget, object):
 
 class DataItem(items.BaseItem, object):
 
+    DefaultDataFileName = 'new_data_file'
     PreviewWidgetClass = DataPreviewWidget
 
     def __init__(self, *args, **kwargs):
@@ -120,8 +121,6 @@ class DataItem(items.BaseItem, object):
         self._data_class = None
         self._data_object = None
 
-    # OVERRIDES
-
     def settings(self):
         """
         Returns tpRigBuilder library settings file
@@ -129,6 +128,45 @@ class DataItem(items.BaseItem, object):
         """
 
         return utils.get_library_settings()
+
+    def write(self, path, objects, icon_path='', sequence_path='', **options):
+        """
+        Writes all the given object data to the given path on disk
+        :param path: str
+        :param objects: list(str)
+        :param icon_path: str
+        :param sequence_path: str
+        :param options: dict
+        """
+
+        super(DataItem, self).write(
+            path=path, objects=objects, icon_path=icon_path, sequence_path=sequence_path, options=options)
+
+        comment = options.get('comment', '-')
+        name = options.get('name', self.DefaultDataFileName)
+        create_version = options.get('create_version', False)
+
+        data_object = self.data_object(name=name, path=path)
+        return data_object.export_data(comment=comment, objects=objects, create_version=create_version)
+
+    def save(self, path=None, *args, **kwargs):
+        """
+        Saves current item
+        :param path:
+        :param args:
+        :param kwargs:
+        :return:
+        """
+
+        valid_save = super(DataItem, self).save(path=path, *args, **kwargs)
+        if not valid_save:
+            return
+
+        # We use the transfer object only to store metadata
+        # NOTE: We must do this call here because if not we will try store the file in an non valid path
+        # NOTE: because during save function all data is stored in a temporal folder until the creation process
+        # is valid
+        return self.transfer_object().save(path=self.transfer_path())
 
     def load(self, objects=None, namespaces=None, **kwargs):
         """
@@ -144,7 +182,7 @@ class DataItem(items.BaseItem, object):
             self.show_error_dialog('Impossible to open file', 'Stored Path and Data Path are different: {}\n{}'.format(stored_path, data_object_path))
             return
 
-        self.data_object().open(stored_path)
+        return self.data_object().open(stored_path)
 
     def export_data(self, comment):
         """
@@ -160,7 +198,7 @@ class DataItem(items.BaseItem, object):
                                                                                             data_object_path))
             return
 
-        self.data_object().export_data(comment)
+        return self.data_object().export_data(comment)
 
     def import_data(self):
         """
@@ -175,7 +213,7 @@ class DataItem(items.BaseItem, object):
                                                                                             data_object_path))
             return
 
-        self.data_object().import_data(stored_path)
+        return self.data_object().import_data(stored_path)
 
     def reference_data(self):
         """
@@ -190,9 +228,7 @@ class DataItem(items.BaseItem, object):
                                                                                             data_object_path))
             return
 
-        self.data_object().reference_data(stored_path)
-
-    # DATA
+        return self.data_object().reference_data(stored_path)
 
     def data_class(self):
         """

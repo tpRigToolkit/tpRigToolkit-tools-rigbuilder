@@ -9,7 +9,7 @@ from __future__ import print_function, division, absolute_import
 
 import os
 
-from tpQtLib.widgets.library import library
+from tpDcc.libs.qt.widgets.library import library
 
 
 class DataLibrary(library.Library, object):
