@@ -8,29 +8,31 @@ Module that contains rig outliner widget for RigBuilder
 from __future__ import print_function, division, absolute_import
 
 import string
+import logging
 
 from Qt.QtCore import *
 from Qt.QtWidgets import *
 
-from tpQtLib.core import qtutils
-from tpPyUtils import osplatform, fileio, path as path_utils, name as name_utils
-
-from tpRigToolkit.core import resource
+import tpDcc
+from tpDcc.libs.python import osplatform, fileio, path as path_utils, name as name_utils
+from tpDcc.libs.qt.core import qtutils
 
 from tpRigToolkit.tools.rigbuilder.items import rig as rig_item
 from tpRigToolkit.tools.rigbuilder.objects import helpers, rig
-from tpRigToolkit.tools.rigbuilder.widgets import basetree
+from tpRigToolkit.tools.rigbuilder.widgets.base import basetree
+
+LOGGER = logging.getLogger('tpRigToolkit')
 
 
 class RigOutlinerTree(basetree.BaseTree, object):
 
-    HEADER_LABELS = ['name']
+    HEADER_LABELS = ['Rigs']
     ITEM_WIDGET = rig_item.RigItem
 
-    ICON_ON = resource.ResourceManager().icon('box_plus')
-    ICON_OFF = resource.ResourceManager().icon('box_minus_alt')
-    ICON_FOLDER = resource.ResourceManager().icon('folder')
-    ICON_FOLDER_OPEN = resource.ResourceManager().icon('open_folder')
+    ICON_ON = tpDcc.ResourcesMgr().icon('box_plus')
+    ICON_OFF = tpDcc.ResourcesMgr().icon('box_minus_alt')
+    ICON_FOLDER = tpDcc.ResourcesMgr().icon('folder')
+    ICON_FOLDER_OPEN = tpDcc.ResourcesMgr().icon('open_folder')
 
     newRig = Signal(object)
     newTopRig = Signal(object)
@@ -45,13 +47,8 @@ class RigOutlinerTree(basetree.BaseTree, object):
         self._settings = settings
         self._console = None
         self._checkable = checkable
-        self._disable_modifiers = True
-        self._shift_activate = False
         self._disable_right_click = False
-        self._handle_selection_change = True
         self._paste_item = None
-        self._dragged_item = None
-        self._drag_parent = None
         self._current_folder = None
         self._text_edit = False
         self._context_menu = None
@@ -64,7 +61,10 @@ class RigOutlinerTree(basetree.BaseTree, object):
         self.setDragEnabled(True)
         self.setDropIndicatorShown(True)
         self.setTabKeyNavigation(True)
-        self.setHeaderHidden(True)
+
+        # TODO: If we set this variable, Maya UI slows a lot (viewport FPS goes down to 40 fps)???
+        # self.setHeaderHidden(True)
+
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.setSelectionBehavior(self.SelectItems)
         self.setSelectionMode(self.SingleSelection)
@@ -95,72 +95,6 @@ class RigOutlinerTree(basetree.BaseTree, object):
                 self.ICON_FOLDER_OPEN.paint(painter, rect)
             else:
                 self.ICON_FOLDER.paint(painter, rect)
-
-    def keyPressEvent(self, event):
-        """
-        Overrides base treewidgets.FileTreeWidget keyPressEvent function
-        :param event: QKeyEvent
-        """
-
-        if event.key() == Qt.Key_Shift:
-            self._shift_activate = True
-
-    def keyReleaseEvent(self, event):
-        """
-        Overrides base treewidgets.FileTreeWidget keyReleaseEvent function
-        :param event: QKeyEvent
-        """
-
-        if event.key() == Qt.Key_Shift:
-            self._shift_activate = False
-
-    def mouseMoveEvent(self, event):
-        """
-        Overrides base treewidgets.FileTreeWidget mouseMoveEvent function
-        :param event: QMouseEvent
-        """
-
-        model_index = self.indexAt(event.pos())
-        item = self.itemAt(event.pos())
-        if not item or model_index.column() == 1:
-            self.clearSelection()
-            self.setCurrentItem(self.invisibleRootItem())
-
-        if event.button() == Qt.RightButton:
-            return
-
-        if model_index.column() == 0 and item:
-            super(RigOutlinerTree, self).mouseMoveEvent(event)
-
-    def mousePressEvent(self, event):
-        """
-        Overrides base treewidgets.FileTreeWidget mousePressEvent function
-        :param event: QMouseEvent
-        """
-
-        item = self.itemAt(event.pos())
-        if self._disable_modifiers:
-            modifiers = QApplication.keyboardModifiers()
-            if modifiers == Qt.ControlModifier:
-                return
-            if modifiers == (Qt.ControlModifier | Qt.ShiftModifier):
-                return
-
-        parent = self.invisibleRootItem()
-        if item:
-            if item.is_folder():
-                self.setCurrentItem(self.invisibleRootItem())
-                return
-            if item.parent():
-                parent = item.parent()
-        else:
-            self.setCurrentItem(self.invisibleRootItem())
-            return
-
-        self._drag_parent = parent
-        self._dragged_item = item
-
-        super(RigOutlinerTree, self).mousePressEvent(event)
 
     def dropEvent(self, event):
         """
@@ -282,15 +216,15 @@ class RigOutlinerTree(basetree.BaseTree, object):
 
         self._context_menu = QMenu()
 
-        add_icon = resource.ResourceManager().icon('add')
-        rename_icon = resource.ResourceManager().icon('rename')
-        duplicate_icon = resource.ResourceManager().icon('clone')
-        copy_icon = resource.ResourceManager().icon('copy')
-        paste_icon = resource.ResourceManager().icon('paste')
-        merge_icon = resource.ResourceManager().icon('merge')
-        delete_icon = resource.ResourceManager().icon('delete')
-        browse_icon = resource.ResourceManager().icon('open')
-        refresh_icon = resource.ResourceManager().icon('refresh')
+        add_icon = tpDcc.ResourcesMgr().icon('add')
+        rename_icon = tpDcc.ResourcesMgr().icon('rename')
+        duplicate_icon = tpDcc.ResourcesMgr().icon('clone')
+        copy_icon = tpDcc.ResourcesMgr().icon('copy')
+        paste_icon = tpDcc.ResourcesMgr().icon('paste')
+        merge_icon = tpDcc.ResourcesMgr().icon('merge')
+        delete_icon = tpDcc.ResourcesMgr().icon('delete')
+        browse_icon = tpDcc.ResourcesMgr().icon('open')
+        refresh_icon = tpDcc.ResourcesMgr().icon('refresh')
 
         self._new_rig_action = self._context_menu.addAction(add_icon, 'New Rig')
         self._new_top_level_rig_action = self._context_menu.addAction(add_icon, 'New Top Level Rig')
@@ -335,7 +269,7 @@ class RigOutlinerTree(basetree.BaseTree, object):
         rig_path = ''
         if hasattr(tree_item, 'get_name'):
             rig_name = tree_item.get_name()
-            rig_path = path.join_path(self._directory, rig_name)
+            rig_path = path_utils.join_path(self._directory, rig_name)
 
         self._add_rig_items(tree_item, rig_path)
 
@@ -381,6 +315,9 @@ class RigOutlinerTree(basetree.BaseTree, object):
         :param item: QTreeWidgetItem
         """
 
+        if self._auto_add_sub_items:
+            self._add_sub_items(item)
+
         if self._shift_activate:
             child_count = item.childCount()
             for i in range(child_count):
@@ -415,6 +352,13 @@ class RigOutlinerTree(basetree.BaseTree, object):
 
         self._current_folder = None
         self._set_item_menu_vis(pos)
+
+        current_item = bool(self._current_item)
+        self._rename_action.setVisible(current_item)
+        self._duplicate_action.setVisible(current_item)
+        self._copy_action.setVisible(current_item)
+        self._copy_special_action.setVisible(current_item)
+        self._delete_action.setVisible(current_item)
 
         self._context_menu.exec_(self.viewport().mapToGlobal(pos))
 
@@ -776,7 +720,7 @@ class RigOutlinerTree(basetree.BaseTree, object):
             if item.is_folder():
                 if self.edit_state:
                     self._new_rig_action.setVisible(True)
-                    # self._top
+                    self._new_top_level_rig_action.setVisible(True)
             else:
                 pass
         else:
@@ -792,6 +736,8 @@ class RigOutlinerTree(basetree.BaseTree, object):
         :param folder:
         :return:
         """
+
+        LOGGER.info('Adding rig item: {}'.format(name))
 
         expand_to = False
         items = self.selectedItems()
