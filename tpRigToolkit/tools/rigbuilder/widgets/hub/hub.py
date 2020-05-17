@@ -7,26 +7,24 @@ Module that contains rig widget for RigBuilder
 
 from __future__ import print_function, division, absolute_import
 
-import logging
-
 from Qt.QtCore import *
 from Qt.QtWidgets import *
 
 import tpDcc
 from tpDcc.libs.qt.core import window
-from tpDcc.libs.qt.widgets import tabs, breadcrumb, stack, options
+from tpDcc.libs.qt.widgets import tabs, breadcrumb, stack
 from tpDcc.libs.python import osplatform, path as path_utils
 
+import tpRigToolkit
 from tpRigToolkit.tools.rigbuilder.core import tool
+from tpRigToolkit.tools.rigbuilder.widgets.base import options
 from tpRigToolkit.tools.rigbuilder.widgets.builder import builder
 from tpRigToolkit.tools.rigbuilder.widgets.rig import rigoutliner
 from tpRigToolkit.tools.rigbuilder.widgets.blueprint import blueprintseditor, blueprint
 from tpRigToolkit.tools.rigbuilder.widgets.puppeteer import puppeteer
 from tpRigToolkit.tools.rigbuilder.objects import rig
 from tpRigToolkit.tools.rigbuilder.tools import datalibrary, controls, properties, puppeteer as puppet_tools
-from tpRigToolkit.tools.rigbuilder.tools import buildnodeslibrary, blueprintslibrary
-
-LOGGER = logging.getLogger('tpRigToolkit')
+from tpRigToolkit.tools.rigbuilder.tools import buildnodeslibrary, blueprintslibrary, renamer
 
 
 class HubWidget(window.BaseWindow, object):
@@ -51,7 +49,7 @@ class HubWidget(window.BaseWindow, object):
         # TODO: Tool registration should be automatic
         for tool_class in [datalibrary.DataLibrary, controls.ControlsTool, properties.PropertiesTool,
                            buildnodeslibrary.BuldNodesLibrary, blueprintslibrary.BlueprintsLibrary,
-                           puppet_tools.PuppetPartsBuilderTool]:
+                           puppet_tools.PuppetPartsBuilderTool, renamer.RenamerTool]:
             self.register_tool_class(tool_class)
 
         super(HubWidget, self).__init__(parent=parent,)
@@ -100,7 +98,7 @@ class HubWidget(window.BaseWindow, object):
         rig_outliner_splitter.setOrientation(Qt.Vertical)
         rig_outliner_splitter.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self._outliner = rigoutliner.RigOutliner(settings=self._settings, project=self._project, console=self._console)
-        self._outliner_options = options.OptionsWidget()
+        self._outliner_options = options.RigBuilderOptionsWidget()
         rig_outliner_splitter.addWidget(self._outliner)
         rig_outliner_splitter.addWidget(self._outliner_options)
 
@@ -146,7 +144,8 @@ class HubWidget(window.BaseWindow, object):
 
     def setup_signals(self):
         self._outliner.tree_widget.itemSelectionChanged.connect(self._on_outliner_item_selection_changed)
-        self._builder.builder_tree().itemSelectionChanged.connect(self._on_build_tree_selection_changed)
+        self._builder.builder_tree().itemSelected.connect(self._on_build_tree_selection_changed)
+        # self._builder.builder_tree().itemSelectionChanged.connect(self._on_build_tree_selection_changed)
         self._builder.createNode.connect(self._on_create_builder_node)
         self._builder_creator.creationCanceled.connect(self._on_cancel_builder_node_creation)
         self._builder_creator.nodeCreated.connect(self._on_builder_node_created)
@@ -325,7 +324,7 @@ class HubWidget(window.BaseWindow, object):
                 tool_class = t
                 break
         if not tool_class:
-            LOGGER.warning('No registered tool found with name: "{}"'.format(tool_name))
+            tpRigToolkit.logger.warning('No registered tool found with name: "{}"'.format(tool_name))
             return None
 
         tool_instance = tool.create_tool_instance(tool_class, self._tools)
@@ -456,9 +455,9 @@ class HubWidget(window.BaseWindow, object):
         self._current_rig.set_library(self.library())
 
         full_path = self._get_current_rig_path()
-        LOGGER.debug('New Selected Rig Path: {}'.format(full_path))
+        tpRigToolkit.logger.debug('New Selected Rig Path: {}'.format(full_path))
         if not osplatform.get_permission(full_path):
-            LOGGER.warning('Could not get permission for rig: {}'.format(rig_name))
+            tpRigToolkit.logger.warning('Could not get permission for rig: {}'.format(rig_name))
 
     def _update_rig(self, rig_name):
         """
@@ -515,7 +514,7 @@ class HubWidget(window.BaseWindow, object):
         self._builder.set_rig(self._current_rig)
         self._builder_creator.set_rig(self._current_rig)
         self._outliner_options.set_option_object(self._current_rig)
-        self._outliner_options.update_options()
+        # self._outliner_options.update_options()
 
         self._builder.refresh()
 
@@ -532,6 +531,7 @@ class HubWidget(window.BaseWindow, object):
         builder_nodes = self._builder.builder_tree().selectedItems()
         if not builder_nodes:
             properties_widget.clear()
+            properties_widget.set_object(None)
             return
 
         item = builder_nodes[0]
@@ -539,7 +539,7 @@ class HubWidget(window.BaseWindow, object):
             return
         item_node = item.node
 
-        properties_widget.clear()
+        properties_widget.clear(update_stack=False)
         properties_widget.set_object(item_node)
 
     # ================================================================================================
@@ -553,7 +553,7 @@ class HubWidget(window.BaseWindow, object):
 
         self._refresh_selected_rig()
 
-    def _on_build_tree_selection_changed(self):
+    def _on_build_tree_selection_changed(self, item):
         """
         Internal callback function that is called when a builder node is selected in the builder node tree
         """
