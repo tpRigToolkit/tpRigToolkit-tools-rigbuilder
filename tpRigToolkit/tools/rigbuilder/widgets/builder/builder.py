@@ -265,7 +265,7 @@ class NodeBuilderCreator(base.BaseWidget, object):
     def _on_create_node(self):
         selected_node = self._nodes_tree.selected_builder_node()
         if not selected_node:
-            self.nodeCreated.emit(None)
+            self.nodeCreated.emit(None, '', '', None)
             return
 
         node_display_name = self._display_name_line.text()

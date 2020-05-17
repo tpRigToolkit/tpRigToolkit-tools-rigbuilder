@@ -15,8 +15,14 @@ import tpDcc as tp
 from tpDcc.libs.qt.core import base
 from tpDcc.libs.qt.widgets import project, dividers, buttons, options
 
+import tpRigToolkit
+from tpRigToolkit.tools.rigbuilder.core import project as rigbulder_project
+
 
 class ProjectWidget(project.ProjectWidget, object):
+
+    PROJECT_CLASS = rigbulder_project.RigBuilderProject
+
     def __init__(self, parent=None):
         super(ProjectWidget, self).__init__(parent=parent)
 
@@ -100,6 +106,7 @@ class ProjectSettingsWidget(base.BaseWidget, object):
         if self._project:
             self._project_image.setPixmap(
                 QPixmap(self._project.get_project_image()).scaled(QSize(150, 150), Qt.KeepAspectRatio))
+        self._naming_widget.set_project(self._project)
 
     def _on_save(self):
         """
@@ -145,6 +152,10 @@ class NamingWidget(base.BaseWidget, object):
         self.main_layout.addWidget(dividers.get_horizontal_separator_widget())
         self.main_layout.addWidget(self._edit_btn)
 
+    def setup_signals(self):
+        self._name_rules.currentIndexChanged.connect(self._on_update_rule)
+        self._edit_btn.clicked.connect(self._on_open_naming_manager)
+
     def set_project(self, project):
         self._project = project
         self.update_rules()
@@ -157,6 +168,55 @@ class NamingWidget(base.BaseWidget, object):
             self._name_rules.clear()
             if not self._project:
                 return
+            naming_lib = self._project.naming_lib
+            if not naming_lib:
+                return
+            naming_lib.load_session()
+            rules = naming_lib.rules
+            for rule in rules:
+                self._name_rules.addItem(rule.name, userData=rule)
+            rule_name = self._set_rule()
+            self._name_rules.setCurrentText(rule_name)
+        except Exception as exc:
+            tpRigToolkit.logger.warning('Error while updating rules: {}'.format(exc))
         finally:
             self._name_rules.blockSignals(False)
+
+    def _set_rule(self, rule=None):
+        if not self._project:
+            return
+        naming_lib = self._project.naming_lib
+        if not naming_lib:
+            return
+
+        if rule:
+            rule_name = rule.name
+            if self._project.settings.has_setting('naming_rule'):
+                current_rule = self._project.settings.get('naming_rule')
+                if current_rule == rule_name:
+                    return
+                self._project.settings.set('naming_rule', rule_name)
+        else:
+            if not self._project.settings.has_setting('naming_rule'):
+                self._project.settings.set('naming_rule', self._name_rules.currentText())
+
+        if not self._project.settings.has_setting('naming_rule'):
+            return
+        rule_name = self._project.settings.get('naming_rule')
+        if not naming_lib.has_rule(rule_name):
+            return
+        naming_lib.set_active_rule(rule_name)
+
+        return rule_name
+
+    def _on_update_rule(self, index):
+        rule = self._name_rules.itemData(index)
+        self._set_rule(rule=rule)
+
+    def _on_open_naming_manager(self):
+        naming_manager_tool = tp.ToolsMgr().launch_tool_by_id(
+            'tpRigToolkit-tools-namemanager', do_reload=True, debug=False, project=self._project)
+        attacher = naming_manager_tool.attacher
+        attacher.closed.connect(self.update_rules)
+
 
