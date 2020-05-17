@@ -12,15 +12,15 @@ __license__ = "MIT"
 __maintainer__ = "Tomas Poveda"
 __email__ = "tpovedatd@gmail.com"
 
-import logging
+import os
 
-from tpDcc.libs.python import folder, fileio, path as path_utils
+from tpDcc.libs.python import folder, fileio, yamlio, path as path_utils
 
+import tpRigToolkit
+from tpRigToolkit.tools import rigbuilder
 from tpRigToolkit.tools.rigbuilder.core import consts, utils, data
 from tpRigToolkit.tools.rigbuilder.scripts import node
-from tpRigToolkit.tools.rigbuilder.objects import helpers, script
-
-LOGGER = logging.getLogger('tpRigToolkit')
+from tpRigToolkit.tools.rigbuilder.objects import script, helpers, unknown
 
 
 class RigObject(script.ScriptObject, object):
@@ -31,6 +31,9 @@ class RigObject(script.ScriptObject, object):
     SCRIPT_EXTENSION = 'yml'
 
     def __init__(self, name=None):
+
+        self._run_nodes = dict()
+
         super(RigObject, self).__init__(name=name)
 
     # ================================================================================================
@@ -56,7 +59,7 @@ class RigObject(script.ScriptObject, object):
         for i in range(script_count):
             script_name = fileio.remove_extension(scripts_list[i])
             script_path = self.get_code_file(script_name)
-            if not path_utils.exists(script_path) or scripts_list[i] in synced_scripts:
+            if not script_path or not path_utils.exists(script_path) or scripts_list[i] in synced_scripts:
                 continue
 
             synced_scripts.append(scripts_list[i])
@@ -90,6 +93,28 @@ class RigObject(script.ScriptObject, object):
 
         self.set_scripts_manifest(scripts_to_add=synced_scripts, states=synced_states)
 
+    def _source_script(self, script, **kwargs):
+        """
+        Internal function that source the given script
+        :param script: str, script in task we want to source
+        :return:
+        """
+
+        script_extension = os.path.splitext(script)[-1]
+        is_python_script = script_extension in ['.pyc', '.py']
+        if is_python_script:
+            return super(RigObject, self)._source_script(script, **kwargs)
+        else:
+
+            tpRigToolkit.logger.info('Sourcing: {}'.format(script))
+            code_path = self.get_code_path()
+            node_path = path_utils.remove_common_path_at_beginning(code_path, script)
+            node_name = os.path.dirname(node_path)
+            builder_node_inst, builder_node_pkg = self.get_build_node_instance(node_name)
+            init_passed = builder_node_inst.run()
+            self._run_nodes[node_name] = [builder_node_inst, builder_node_pkg]
+            return builder_node_pkg, init_passed, init_passed
+
     def _reset(self):
         """
         Internal function resets all rig variables
@@ -98,6 +123,7 @@ class RigObject(script.ScriptObject, object):
         super(RigObject, self)._reset()
 
         self._parts = list()
+        self._run_nodes.clear()
 
     def _get_invalid_code_names(self):
         invalid_folders = super(RigObject, self)._get_invalid_code_names()
@@ -133,6 +159,26 @@ class RigObject(script.ScriptObject, object):
             fileio.create_file(self.ENABLE_FILE, rig_path)
         else:
             fileio.delete_file(self.ENABLE_FILE, rig_path, show_warning=False)
+
+    def enable_all_scripts(self):
+        """
+        Enables all the scripts of current rig
+        """
+
+        scripts, states = self.get_scripts_manifest()
+        for i in range(len(states)):
+            states[i] = True
+        self.set_scripts_manifest(scripts, states=states)
+
+    def disable_all_scripts(self):
+        """
+        Enables all the scripts of current rig
+        """
+
+        scripts, states = self.get_scripts_manifest()
+        for i in range(len(states)):
+            states[i] = False
+        self.set_scripts_manifest(scripts, states=states)
 
     def is_rig(self):
         """
@@ -178,7 +224,7 @@ class RigObject(script.ScriptObject, object):
                 override_rig.set_directory(path)
                 override_rig.set_data_override(override_rig)
 
-        LOGGER.info('Parent rig: {}'.format(parent_rig.get_path()))
+        tpRigToolkit.logger.info('Parent rig: {}'.format(parent_rig.get_path()))
 
         return parent_rig
 
@@ -260,7 +306,7 @@ class RigObject(script.ScriptObject, object):
 
     def add_part(self, name):
         """
-        Adsd given part to the rig
+        Adds given part to the rig
         :param name: str
         :return: Rig, instance of the given part
         """
@@ -347,12 +393,12 @@ class RigObject(script.ScriptObject, object):
         node_folder.set_data_type(data_type)
         data_inst = node_folder.get_folder_data_instance()
         if not data_inst:
-            LOGGER.warning('Impossible to create node of type {} because that data is not supported!'.format(data_type))
+            tpRigToolkit.logger.warning('Impossible to create node of type {} because that data is not supported!'.format(data_type))
             return
 
         data_inst.create(builder_node)
 
-        # # TODO: We should retrieve file path directly from data instance (not through data object)
+        # TODO: We should retrieve file path directly from data instance (not through data object)
         file_name = data_inst.get_file()
 
         if not self.is_in_manifest('{}.{}'.format(name, node.NodeData.get_data_extension())):
@@ -360,6 +406,65 @@ class RigObject(script.ScriptObject, object):
                 ['{}.{}'.format(name, node.NodeData.get_data_extension())], append=True)
 
         return file_name
+
+    def get_build_node_instance(self, node_name):
+
+        if node_name in self._run_nodes:
+            return self._run_nodes[node_name]
+
+        node_info = self.get_node_info(node_name)
+        node_class = node_info.get('class', None)
+        if not node_class:
+            tpRigToolkit.logger.warning(
+                'Impossible to retrieve builder node with class: "{}" for "{}"'.format(node_class, node_name))
+            return None, None
+        node_package = node_info.get('package', None)
+        if not node_package:
+            tpRigToolkit.logger.warning(
+                'Impossible to retrieve builder node from package: "{}" for "{}"'.format(node_class, node_name))
+            return None, None
+
+        pkg = rigbuilder.PkgsMgr().get_package_by_name(node_package)
+        if not pkg:
+            tpRigToolkit.logger.warning('No package with name "{}" found!'.format(node_package))
+            return None, None
+
+        builder_node_class = pkg.get_builder_node_class_by_name(node_class)
+        if not builder_node_class:
+            tpRigToolkit.logger.warning('No builder node class found with name: "{}"'.format(node_class))
+            builder_node = unknown.UnknownNode(node_name)
+        else:
+            builder_node = builder_node_class(node_name, rig=self)
+
+        code_folder = os.path.dirname(self.get_code_folder(node_name))
+        builder_node.set_directory(code_folder)
+        # We force the creation of the options file
+        builder_node.get_option_file()
+
+        return builder_node, pkg
+
+    def get_node_info(self, node_name):
+        """
+        Returns builder node info with the given name
+        :param node_name: str
+        :return: dict
+        """
+
+        node_info_file = self.get_code_file(node_name)
+        if not node_info_file or not os.path.isfile(node_info_file):
+            tpRigToolkit.logger.warning('Impossible to retrieve node info for "{}"!'.format(node_info_file))
+            return dict()
+
+        return yamlio.read_file(node_info_file)
+
+    def rename_build_node(self, node_name, new_name):
+        node_info_file = self.get_code_file(node_name)
+        info_file_ext = os.path.splitext(node_info_file)[-1]
+        if not new_name.endswith(info_file_ext):
+            new_name = '{}{}'.format(new_name, info_file_ext)
+        fileio.rename_file(os.path.basename(node_info_file), os.path.dirname(node_info_file), new_name)
+
+        return True
 
     # ================================================================================================
     # ======================== INTERNAL

@@ -239,12 +239,13 @@ class RigHelpers(ScriptHelpers, object):
         return new_object
 
     @staticmethod
-    def find_rigs(directory=None, return_also_non_objects_list=False):
+    def find_rigs(directory=None, return_also_non_objects_list=False, as_full_path=False):
         """
         Will try to find the objects in the given directory
         If no directory is given, it will search in teh current working directory
         :param directory: str, directory to search for objects
         :param return_also_non_objects_list: bool
+        :param as_full_path: bool
         :return: list<str>, objects in the given directory
         """
 
@@ -253,27 +254,27 @@ class RigHelpers(ScriptHelpers, object):
 
         LOGGER.info('Finding rigs on "{}"'.format(directory))
 
-        found = list()
-        non_found = list()
+        found = dict()
+        non_found = dict()
         for root, dirs, files in os.walk(directory):
             for d in dirs:
                 try:
                     full_path = path_utils.join_path(root, d)
                 except Exception:
-                    pass
+                    continue
                 if RigHelpers.is_rig(full_path):
-                    found.append(d)
+                    found[d] = full_path
                     continue
                 elif return_also_non_objects_list:
                     if not d.startswith(consts.FOLDERS_PREFIX) and not d.endswith(
                             consts.FOLDERS_SUFFIX) and d != 'Trash':
-                        non_found.append(d)
+                        non_found[d] = full_path
             break
 
         if not return_also_non_objects_list:
-            return found
+            return found.values() if as_full_path else found.keys()
         else:
-            return [found, non_found]
+            return [found.values(), non_found.values()] if as_full_path else [found.keys(), non_found.keys()]
 
     @staticmethod
     def get_unused_rig_name(directory=None, name=None):
