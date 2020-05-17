@@ -258,6 +258,7 @@ class ScriptObject(base.BaseObject, object):
 
         self._reset_builtin(**kwargs)
         tp.Dcc.enable_undo()
+        init_passed = False
 
         try:
             if not path_utils.is_file(script):
@@ -285,8 +286,8 @@ class ScriptObject(base.BaseObject, object):
             LOGGER.debug('START\t{}\n\n'.format(basename))
 
             module, init_passed, status = self._source_script(script, **kwargs)
-        except Exception:
-            LOGGER.warning('{} did not source!'.format(script))
+        except Exception as exc:
+            LOGGER.warning('{} did not source! {}'.format(script, exc))
             status = traceback.format_exc()
             init_passed = False
             if hard_error:
@@ -298,21 +299,21 @@ class ScriptObject(base.BaseObject, object):
                     LOGGER.warning('Could not delete module: {}!'.format(module))
                 LOGGER.error('{}\n'.format(status))
                 raise
+        finally:
+            if init_passed:
+                try:
+                    if hasattr(module, 'main'):
+                        module.main()
+                        status = ScriptStatus.SUCCESS
+                except Exception:
+                    status = traceback.format_exc()
+                    self._reset_builtin(**kwargs)
+                    if hard_error:
+                        tp.Dcc.disable_undo()
+                        LOGGER.error('{}\n'.format(status))
+                        raise
 
-        if init_passed:
-            try:
-                if hasattr(module, 'main'):
-                    module.main()
-                    status = ScriptStatus.SUCCESS
-            except Exception:
-                status = traceback.format_exc()
-                self._reset_builtin(**kwargs)
-                if hard_error:
-                    tp.Dcc.disable_undo()
-                    LOGGER.error('{}\n'.format(status))
-                    raise
-
-        tp.Dcc.disable_undo()
+            tp.Dcc.disable_undo()
 
         del module
         self._reset_builtin(**kwargs)
@@ -846,7 +847,7 @@ class ScriptObject(base.BaseObject, object):
         :return: str
         """
 
-        split_path = code_path.split('{}/'.format(self.CODE_FOLDER_NAME))
+        split_path = code_path.split('{}/'.format(self.CODE_FOLDER))
         if len(split_path) == 2:
             parts = split_path[1].split('/')
             if len(parts) > 2:
