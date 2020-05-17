@@ -33,6 +33,7 @@ class BuildTree(scriptstree.ScriptTree, object):
 
     createNode = Signal()
     renameNode = Signal()
+    itemSelected = Signal(object)
 
     def __init__(self, settings=None, parent=None):
         super(BuildTree, self).__init__(settings=settings, parent=parent)
@@ -42,6 +43,15 @@ class BuildTree(scriptstree.ScriptTree, object):
     # ================================================================================================
     # ======================== OVERRIDES
     # ================================================================================================
+
+    def mouseReleaseEvent(self, event):
+        item = self.itemAt(event.pos())
+        if item and event.button() == Qt.LeftButton:
+            self.itemSelected.emit(item)
+        else:
+            self.itemSelected.emit(None)
+
+        super(BuildTree, self).mouseReleaseEvent(event)
 
     def refresh(self, sync=False, scripts_and_states=[]):
         super(BuildTree, self).refresh(sync=sync, scripts_and_states=scripts_and_states)
@@ -94,8 +104,9 @@ class BuildTree(scriptstree.ScriptTree, object):
 
         self.buildSignalsConnected = True
 
-    def _move_item(self, old_name, new_name, item):
-        super(BuildTree, self)._move_item(old_name=old_name, new_name=new_name, item=item)
+    def _update_item(self, item):
+        super(BuildTree, self)._update_item(item)
+
         item.update_node()
 
     def _rename_item(self, item, new_name):
@@ -129,7 +140,9 @@ class BuildTree(scriptstree.ScriptTree, object):
         item.setBackground(0, background)
 
         try:
-            status = object.run(rig_object=item.get_object())
+            if not object.rig:
+                object.rig = item.get_object()
+            status = object.run()
             status = status if status is not None else 'Success'
             log = osplatform.get_env_var('RIGBUILDER_LAST_TEMP_LOG')
             item.set_log(log)

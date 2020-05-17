@@ -152,7 +152,7 @@ class BaseTree(treewidgets.FileTreeWidget, object):
         if event.key() == Qt.Key_Shift:
             self._shift_activate = True
 
-    def keyReleaseEvent(self ,event):
+    def keyReleaseEvent(self, event):
         if event.key() == Qt.Key_Shift:
             self._shift_activate = False
 

@@ -55,7 +55,6 @@ class ScriptTree(basetree.BaseTree, object):
         # self.setTabKeyNavigation(True)
         # self.setSelectionBehavior(self.SelectItems)
 
-
     # ================================================================================================
     # ======================== OVERRIDES
     # ================================================================================================
@@ -807,6 +806,8 @@ class ScriptTree(basetree.BaseTree, object):
             new_name = self._get_item_path_name(new_item)
             moved_items.append([old_name, new_name, new_item])
 
+            self._update_item(item)
+
         for item in remove_items:
             item[1].removeChild(item[0])
 
@@ -827,6 +828,8 @@ class ScriptTree(basetree.BaseTree, object):
         if entered_parent:
             entered_parent.text(0)
 
+        added_items = list()
+
         for item in from_list.selectedItems():
             children = item.takeChildren()
             filename = item.get_text()
@@ -839,6 +842,7 @@ class ScriptTree(basetree.BaseTree, object):
             if not parent:
                 parent = self.invisibleRootItem()
             remove_items.append([item, parent])
+            added_items.append(new_item)
 
             insert_row = self.indexFromItem(entered_item, column=0).row()
             if self._drop_indicator_position == self.BelowItem:
@@ -874,6 +878,19 @@ class ScriptTree(basetree.BaseTree, object):
         for moved_item in moved_items:
             old_name, new_name, item = moved_item
             self._move_item(old_name, new_name, item)
+
+        for new_item in added_items:
+            self._update_item(new_item)
+
+    def _update_item(self, item):
+        """
+        Internal function that can be used to update internal data of the item after add/insert operations
+        Can be override in sub classes
+        :param item:
+        :return:
+        """
+
+        pass
 
     # ================================================================================================
     # ======================== CALLBACKS
