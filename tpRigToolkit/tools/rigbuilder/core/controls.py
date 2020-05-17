@@ -16,6 +16,7 @@ import os
 
 from tpDcc.libs.python import decorators
 from tpRigToolkit.libs.controlrig.core import controllib
+from tpRigToolkit.tools.controlrig.widgets import controlrig
 
 from tpRigToolkit.tools import rigbuilder
 
@@ -32,3 +33,12 @@ class RigBuilderControlLib(controllib.ControlLib, object):
         self.controls_file = os.path.join(project.full_path, 'controls.json')
 
         self.load_control_data()
+
+
+class RigBuilderControlSelector(controlrig.ControlSelector, object):
+
+    CONTROLS_LIB = RigBuilderControlLib
+
+    def __init__(self, controls_path=None, parent=None):
+        super(RigBuilderControlSelector, self).__init__(
+            controls_path=controls_path,  parent=parent)

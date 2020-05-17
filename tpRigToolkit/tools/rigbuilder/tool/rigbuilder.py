@@ -12,25 +12,20 @@ __license__ = "MIT"
 __maintainer__ = "Tomas Poveda"
 __email__ = "tpovedatd@gmail.com"
 
-import os
+from functools import partial
 
 from Qt.QtCore import *
 from Qt.QtWidgets import *
 from Qt.QtGui import *
 
-import logging
-
 import tpDcc
-from tpDcc.libs.python import path as path_utils
-from tpDcc.libs.qt.core import window
+from tpDcc.libs.qt.core import window, qtutils
 from tpDcc.libs.qt.widgets import stack, dividers
 
-from tpRigToolkit.tools import rigbuilder
-from tpRigToolkit.tools.rigbuilder.core import utils
+import tpRigToolkit
 from tpRigToolkit.tools.rigbuilder.widgets.hub import hub
+from tpRigToolkit.tools.rigbuilder.core import api, tool
 from tpRigToolkit.tools.rigbuilder.widgets.base import project, console
-
-LOGGER = logging.getLogger('tpRigToolkit')
 
 
 class RigBuilder(window.BaseWindow, object):
@@ -47,13 +42,6 @@ class RigBuilder(window.BaseWindow, object):
 
         super(RigBuilder, self).__init__(settings=settings, parent=parent)
 
-        # Force initialization of managers
-        rigbuilder.DataMgr()
-        rigbuilder.PkgsMgr().register_package_path(
-            path_utils.clean_path(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'packages')))
-        for data_file_dir in utils.get_script_files_directory():
-            rigbuilder.ScriptsMgr().add_directory(data_file_dir)
-
         self._projects_widget.set_settings(self._settings)
         self._hub_widget.set_settings(self._settings)
 
@@ -69,7 +57,7 @@ class RigBuilder(window.BaseWindow, object):
         self._progress_toolbar.setVisible(False)
         self.menuBar().setVisible(False)
 
-    #     self._register_tools()
+        self._register_tools()
         if self._project_to_open:
             self.open_project(self._project_to_open)
 
@@ -110,7 +98,7 @@ class RigBuilder(window.BaseWindow, object):
         self._project = project
         self._hub_widget.set_project(project)
         self._project_settings_widget.set_project(project)
-        rigbuilder.project = project
+        api.set_project(project)
 
     def open_project(self, project_name):
         """
@@ -120,7 +108,7 @@ class RigBuilder(window.BaseWindow, object):
 
         project_to_open = self._projects_widget.get_project_by_name(project_name)
         if not project_to_open:
-            LOGGER.warning('Project with name {} not found!'.format(project_name))
+            tpRigToolkit.logger.warning('Project with name {} not found!'.format(project_name))
             return
 
         self.set_project(project_to_open)
@@ -148,7 +136,7 @@ class RigBuilder(window.BaseWindow, object):
         """
 
         if not self._project:
-            LOGGER.warning('Impossible to open project. Project is not defined.')
+            tpRigToolkit.logger.warning('Impossible to open project. Project is not defined.')
             self._project_options_action.setIcon(QIcon())
             self._project_options_action.setText('')
             return False
@@ -182,7 +170,7 @@ class RigBuilder(window.BaseWindow, object):
 
     def _open_project_options(self):
         if not self._project:
-            LOGGER.warning('Impossible to open project settings. Project is not defined.')
+            tpRigToolkit.logger.warning('Impossible to open project settings. Project is not defined.')
             return False
 
         self._stack.slide_in_index(2)
@@ -286,37 +274,37 @@ class RigBuilder(window.BaseWindow, object):
 
         go_back_action.triggered.connect(self._on_go_to_projects)
 
-    # def _register_tools(self):
-    #     """
-    #     Internal function that registers all available tools for tpRigToolkit.tools.rignode
-    #     """
-    #
-    #     if not self._hub_widget.tools_classes:
-    #         LOGGER.info('No tools available!')
-    #         return
-    #
-    #     settings = self.settings()
-    #     for tool_class in self._hub_widget.tools_classes:
-    #         if issubclass(tool_class, tool.DockTool):
-    #             tools_menu = qtutils.get_or_create_menu(self.menuBar(), 'Tools')
-    #             self.menuBar().addMenu(tools_menu)
-    #             show_tool_action = tools_menu.addAction(tool_class.NAME)
-    #             icon = tool_class.icon()
-    #             if icon:
-    #                 show_tool_action.setIcon(icon)
-    #             show_tool_action.triggered.connect(partial(self._hub_widget.invoke_dock_tool_by_name, tool_class.NAME))
-    #             # show_tool_action.triggered.connect(
-    #             #     lambda tool_name=tool_class.NAME: self._hub_widget.invoke_dock_tool_by_name(tool_name))
-    #             settings.beginGroup('DockTools')
-    #             child_groups = settings.childGroups()
-    #             for dock_tool_group_name in child_groups:
-    #                 settings.beginGroup(dock_tool_group_name)
-    #                 if dock_tool_group_name in [t.unique_name() for t in self._tools]:
-    #                     continue
-    #                 tool_name = dock_tool_group_name.split('::')[0]
-    #                 self._hub_widget.invoke_dock_tool_by_name(tool_name, settings)
-    #                 settings.endGroup()
-    #             settings.endGroup()
+    def _register_tools(self):
+        """
+        Internal function that registers all available tools for tpRigToolkit.tools.rignode
+        """
+
+        if not self._hub_widget.tools_classes:
+            tpRigToolkit.logger.info('No tools available!')
+            return
+
+        settings = self.settings()
+        for tool_class in self._hub_widget.tools_classes:
+            if issubclass(tool_class, tool.DockTool):
+                tools_menu = qtutils.get_or_create_menu(self.menuBar(), 'Tools')
+                self.menuBar().addMenu(tools_menu)
+                show_tool_action = tools_menu.addAction(tool_class.NAME)
+                icon = tool_class.icon()
+                if icon:
+                    show_tool_action.setIcon(icon)
+                show_tool_action.triggered.connect(partial(self._hub_widget.invoke_dock_tool_by_name, tool_class.NAME))
+                # show_tool_action.triggered.connect(
+                #     lambda tool_name=tool_class.NAME: self._hub_widget.invoke_dock_tool_by_name(tool_name))
+                settings.beginGroup('DockTools')
+                child_groups = settings.childGroups()
+                for dock_tool_group_name in child_groups:
+                    settings.beginGroup(dock_tool_group_name)
+                    if dock_tool_group_name in [t.unique_name() for t in self._tools]:
+                        continue
+                    tool_name = dock_tool_group_name.split('::')[0]
+                    self._hub_widget.invoke_dock_tool_by_name(tool_name, settings)
+                    settings.endGroup()
+                settings.endGroup()
 
     # ============================================================================================================
     # CALLBACKS
@@ -333,7 +321,7 @@ class RigBuilder(window.BaseWindow, object):
             self.set_project(project)
         else:
             if not self._project:
-                LOGGER.warning('Impossible to retrieve already opened project! Restart the tool please')
+                tpRigToolkit.logger.warning('Impossible to retrieve already opened project! Restart the tool please')
                 return False
 
         self._open_project_widget()

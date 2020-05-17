@@ -14,8 +14,9 @@ __email__ = "tpovedatd@gmail.com"
 
 import os
 
-import tpDcc
+import tpDcc as tp
 from tpDcc.core import tool
+from tpDcc.libs.python import modules, path as path_utils
 from tpDcc.libs.qt.widgets import toolset
 
 # Defines ID of the tool
@@ -77,6 +78,36 @@ class RigBuilderToolset(toolset.ToolsetWidget, object):
     def contents(self):
 
         from tpRigToolkit.tools.rigbuilder.tool import rigbuilder
+
+        init()
         rig_builder = rigbuilder.RigBuilder(settings=self._settings, project_name=self._project_name, parent=self)
 
         return [rig_builder]
+
+
+def init():
+    """
+    Function that initializes RigBuilder
+    """
+
+    import tpRigToolkit
+    from tpRigToolkit.tools import rigbuilder
+    from tpRigToolkit.tools.rigbuilder.core import utils
+
+    # Force initialization of managers
+    rigbuilder.DataMgr()
+    rigbuilder.PkgsMgr().register_package_path(
+        path_utils.clean_path(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'packages')))
+    for data_file_dir in utils.get_script_files_directory():
+        rigbuilder.ScriptsMgr().add_directory(data_file_dir)
+
+    dcc_name = tp.Dcc.get_name()
+    packages_dcc = 'tpRigToolkit.tools.rigbuilder.dccs.{}.packages'.format(dcc_name)
+    try:
+        valid_module = modules.import_module(packages_dcc)
+        if valid_module:
+            dcc_packages_path = valid_module.__path__[0]
+            if dcc_packages_path and os.path.isdir(dcc_packages_path):
+                rigbuilder.PkgsMgr().register_package_path(dcc_packages_path)
+    except Exception:
+        tpRigToolkit.logger.info('No rigbuilder packages found for DCC: {}'.format(dcc_name))
