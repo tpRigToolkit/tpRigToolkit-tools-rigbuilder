@@ -50,6 +50,8 @@ class DataLibrary(tool.DockTool, object):
 
     def set_project(self, project):
         self._data_library.set_project(project)
+        if project:
+            self._data_library.set_path(project.full_path)
 
     def set_path(self, path):
         self._data_library.set_path(path)
