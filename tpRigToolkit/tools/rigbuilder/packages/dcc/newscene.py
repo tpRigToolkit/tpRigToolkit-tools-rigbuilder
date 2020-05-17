@@ -19,8 +19,8 @@ class NewScene(build.BuildObject, object):
     DESCRIPTION = 'Creates a new DCC scene'
     ICON = 'new'
 
-    def __init__(self, name=None):
-        super(NewScene, self).__init__(name=name)
+    def __init__(self, name=None, rig=None):
+        super(NewScene, self).__init__(name=name, rig=rig)
 
     def run(self, **kwargs):
         force = self.get_option('Force', group='Inputs')

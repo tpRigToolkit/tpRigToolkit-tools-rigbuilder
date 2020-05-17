@@ -8,19 +8,15 @@ Module that contains item implementation for build
 from __future__ import print_function, division, absolute_import
 
 import os
-import logging
 
 from Qt.QtCore import *
 from Qt.QtWidgets import *
 from Qt.QtGui import *
 
 import tpDcc
-from tpDcc.libs.python import fileio, yamlio
 
-from tpRigToolkit.tools import rigbuilder
+import tpRigToolkit
 from tpRigToolkit.tools.rigbuilder.items import base
-
-LOGGER = logging.getLogger('tpRigToolkit')
 
 
 class BuildItemsDelegate(QStyledItemDelegate, object):
@@ -260,30 +256,9 @@ class BuildItem(base.BaseItem, object):
     # ================================================================================================
 
     def update_node(self):
-        node_info = self.get_node_info()
-        node_class = node_info.get('class', None)
-        if not node_class:
-            LOGGER.warning(
-                'Impossible to retrieve builder node with class: "{}" for "{}"'.format(node_class, self.get_text()))
-            return
-        node_package = node_info.get('package', None)
-        if not node_package:
-            LOGGER.warning(
-                'Impossible to retrieve builder node from package: "{}" for "{}"'.format(node_class, self.get_text()))
-            return
-
-        pkg = rigbuilder.PkgsMgr().get_package_by_name(node_package)
-        if not pkg:
-            LOGGER.warning('No package with name "{}" found!'.format(node_package))
-            return
-
         rig_object = self.get_object()
         item_name = self.get_name()
-        builder_node_class = pkg.get_builder_node_class_by_name(node_class)
-        builder_node = builder_node_class(item_name)
-        builder_node.set_directory(os.path.dirname(rig_object.get_code_folder(item_name)))
-        # We force the creation of the options file
-        builder_node.get_option_file()
+        builder_node, builder_node_pkg = rig_object.get_build_node_instance(item_name)
         self._node = builder_node
         if self._node:
             self._node.setup_context_menu(self._context_menu)
@@ -291,22 +266,13 @@ class BuildItem(base.BaseItem, object):
     def rename_node(self, new_name):
         rig_object = self.get_object()
         item_name = self.get_name()
-        node_info_file = rig_object.get_code_file(item_name)
-        info_file_ext = os.path.splitext(node_info_file)[-1]
-        if not new_name.endswith(info_file_ext):
-            new_name = '{}{}'.format(new_name, info_file_ext)
-        fileio.rename_file(os.path.basename(node_info_file), os.path.dirname(node_info_file), new_name)
+        valid_rename = rig_object.rename_build_node(item_name, new_name)
+        if not valid_rename:
+            tpRigToolkit.logger.warning('Was not possible to rename build node: {} >> {}'.format(item_name, new_name))
+            return False
+
         item_name_split = item_name.split('/')
         new_item_name = item_name.replace(item_name_split[-1], os.path.splitext(new_name)[0])
         self._node.set_option('Name', [new_item_name, 'nonedittext'], group='Base')
 
-    def get_node_info(self):
-        rig_object = self.get_object()
-        item_name = self.get_name()
-        node_info_file = rig_object.get_code_file(item_name)
-        if not node_info_file or not os.path.isfile(node_info_file):
-            LOGGER.warning('Impossible to retrieve node info for "{}"!'.format(self.get_text()))
-            return dict()
-
-        return yamlio.read_file(node_info_file)
-
+        return True

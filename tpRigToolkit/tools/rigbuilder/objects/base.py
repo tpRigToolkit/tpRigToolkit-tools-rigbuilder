@@ -14,15 +14,13 @@ __email__ = "tpovedatd@gmail.com"
 
 import os
 import string
-import logging
 
 from tpDcc.core import options
 from tpDcc.libs.python import folder, settings, version, path as path_utils
 
+import tpRigToolkit
 from tpRigToolkit.tools.rigbuilder.core import consts, utils, data
 from tpRigToolkit.tools.rigbuilder.objects import helpers
-
-LOGGER = logging.getLogger('tpRigToolkit')
 
 
 class BaseObject(options.OptionObject):
@@ -491,7 +489,8 @@ class BaseObject(options.OptionObject):
         """
 
         if not self.has_sub_folder(data_name, sub_folder_name):
-            LOGGER.warning('Data {} has no sub folder: {} to copy from!'.format(data_name, sub_folder_name))
+            tpRigToolkit.logger.warning(
+                'Data {} has no sub folder: {} to copy from!'.format(data_name, sub_folder_name))
             return
 
         source_file = self.get_data_file_or_folder(data_name, sub_folder_name)
@@ -507,7 +506,7 @@ class BaseObject(options.OptionObject):
         """
 
         if not self.has_sub_folder(data_name, sub_folder_name):
-            LOGGER.warning('Data {} has no sub folder: {} to copy to!'.format(data_name, sub_folder_name))
+            tpRigToolkit.logger.warning('Data {} has no sub folder: {} to copy to!'.format(data_name, sub_folder_name))
             return
 
         source_file = self.get_data_file_or_folder(data_name)
@@ -534,9 +533,9 @@ class BaseObject(options.OptionObject):
         """
 
         data_folder_name = self.get_data_folder(name)
-        LOGGER.debug('Open data in: {}'.format(data_folder_name))
+        tpRigToolkit.logger.debug('Open data in: {}'.format(data_folder_name))
         if not path_utils.is_dir(data_folder_name):
-            LOGGER.warning('{} data does not exists in {}!'.format(name, self.get_name()))
+            tpRigToolkit.logger.warning('{} data does not exists in {}!'.format(name, self.get_name()))
             return
 
         inst, original_sub_folder = self._get_data_instance(name, sub_folder)
@@ -549,7 +548,8 @@ class BaseObject(options.OptionObject):
             inst.set_sub_folder(original_sub_folder)
             return value
         else:
-            LOGGER.warning('Could not open data {} in rig {}. It has no open function'.format(name, self.get_name()))
+            tpRigToolkit.logger.warning(
+                'Could not open data {} in rig {}. It has no open function'.format(name, self.get_name()))
 
     def import_data(self, name, sub_folder=None):
         """
@@ -559,9 +559,9 @@ class BaseObject(options.OptionObject):
         """
 
         data_folder_name = self.get_data_folder(name)
-        LOGGER.info('Import data from: {}'.format(data_folder_name))
+        tpRigToolkit.logger.info('Import data from: {}'.format(data_folder_name))
         if not path_utils.is_dir(data_folder_name):
-            LOGGER.warning('{} data does not exists in {}!'.format(name, self.get_name()))
+            tpRigToolkit.logger.warning('{} data does not exists in {}!'.format(name, self.get_name()))
             return
 
         if not self.library():
@@ -589,9 +589,9 @@ class BaseObject(options.OptionObject):
         """
 
         data_folder_name = self.get_data_folder(name)
-        LOGGER.debug('Reference data in {}'.format(data_folder_name))
+        tpRigToolkit.logger.debug('Reference data in {}'.format(data_folder_name))
         if not path_utils.is_dir(data_folder_name):
-            LOGGER.warning('{} data does not exists in {}'.format(name, self.get_name()))
+            tpRigToolkit.logger.warning('{} data does not exists in {}'.format(name, self.get_name()))
             return
 
         instance, original_sub_folder = self._get_data_instance(name, sub_folder)
@@ -599,7 +599,7 @@ class BaseObject(options.OptionObject):
         if hasattr(instance, 'reference_data'):
             return_value = instance.reference_data()
         else:
-            LOGGER.warning(
+            tpRigToolkit.logger.warning(
                 'Could not reference data {0} in rig {1}. {1} has no reference function'.format(name, self.get_name()))
 
         instance.set_sub_folder(original_sub_folder)
@@ -675,9 +675,9 @@ class BaseObject(options.OptionObject):
         """
 
         data_folder_name = self.get_data_folder(name)
-        LOGGER.debug('Cleaning Student License in: {}'.format(data_folder_name))
+        tpRigToolkit.logger.debug('Cleaning Student License in: {}'.format(data_folder_name))
         if not path_utils.is_dir(data_folder_name):
-            LOGGER.warning('{} data does not exists in {}!'.format(name, self.get_name()))
+            tpRigToolkit.logger.warning('{} data does not exists in {}!'.format(name, self.get_name()))
             return
 
         inst, original_sub_folder = self._get_data_instance(name, None)
@@ -907,6 +907,6 @@ class BaseObject(options.OptionObject):
         object_name = string.join([new_path[-1]], '/')
         object_directory = string.join(new_path[:-1], '/')
 
-        LOGGER.debug('Relative object name: {} and path {}'.format(object_name, object_directory))
+        tpRigToolkit.logger.debug('Relative object name: {} and path {}'.format(object_name, object_directory))
 
         return object_name, object_directory

@@ -19,8 +19,8 @@ class Blueprint(build.BuildObject, object):
     DESCRIPTION = 'Creates RigBuilder Blueprint'
     ICON = 'blueprint'
 
-    def __init__(self, name=None):
-        super(Blueprint, self).__init__(name=name)
+    def __init__(self, name=None, rig=None):
+        super(Blueprint, self).__init__(name=name, rig=rig)
 
     def create_properties_widget(self, properties_widget):
         super(Blueprint, self).create_properties_widget(properties_widget=properties_widget)

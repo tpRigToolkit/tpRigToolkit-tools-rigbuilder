@@ -17,8 +17,8 @@ class NodeBlock(build.BuildObject, object):
     DESCRIPTION = 'Block that contains other nodes'
     ICON = 'group_objects'
 
-    def __init__(self, name=None):
-        super(NodeBlock, self).__init__(name=name)
+    def __init__(self, name=None, rig=None):
+        super(NodeBlock, self).__init__(name=name, rig=rig)
 
     def run(self, **kwargs):
         return True

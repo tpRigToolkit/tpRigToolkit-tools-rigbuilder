@@ -22,8 +22,8 @@ class PythonScript(build.BuildObject, object):
     DESCRIPTION = 'Launches a Python script'
     ICON = 'python'
 
-    def __init__(self, name=None):
-        super(PythonScript, self).__init__(name=name)
+    def __init__(self, name=None, rig=None):
+        super(PythonScript, self).__init__(name=name, rig=rig)
 
     def run(self, **kwargs):
         self._create_python_file()

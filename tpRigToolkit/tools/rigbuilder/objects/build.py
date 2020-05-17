@@ -12,15 +12,12 @@ __license__ = "MIT"
 __maintainer__ = "Tomas Poveda"
 __email__ = "tpovedatd@gmail.com"
 
-import logging
 from collections import OrderedDict
 
 import tpDcc
 
 from tpRigToolkit.tools.rigbuilder.core import consts
 from tpRigToolkit.tools.rigbuilder.objects import script
-
-LOGGER = logging.getLogger('tpRigToolkit')
 
 
 class BuildObject(script.ScriptObject, object):
@@ -33,11 +30,20 @@ class BuildObject(script.ScriptObject, object):
     PROPERTIES_FILE_NAME = consts.PROPERTIES_FILE_NAME
     PROPERTIES_FILE_EXTENSION = consts.PROPERTIES_FILE_EXTENSION
 
-    def __init__(self, name=None):
+    def __init__(self, name=None, rig=None):
 
         self._item_icon = None
+        self._rig = rig
 
         super(BuildObject, self).__init__(name=name)
+
+    @property
+    def rig(self):
+        return self._rig
+
+    @rig.setter
+    def rig(self, value):
+        self._rig = value
 
     def get_icon(self):
         """
@@ -50,13 +56,21 @@ class BuildObject(script.ScriptObject, object):
 
         return tpDcc.ResourcesMgr().icon(self.ICON)
 
-    def run(self, *args, **kwargs):
+    def run(self, rig_object, project, *args, **kwargs):
         """
         Function that executes build function
         :return: bool
         """
 
         return False
+
+    def _get_value_from_option_type(self, value, option_type):
+        if option_type == 'rigcontrol':
+            value = [value, 'rigcontrol']
+        else:
+            value = super(BuildObject, self)._get_value_from_option_type(value=value, option_type=option_type)
+
+        return value
 
     def setup_options(self):
 
@@ -83,5 +97,5 @@ class BuildObject(script.ScriptObject, object):
 
 
 class PackObject(BuildObject, object):
-    def __init__(self, name=None):
-        super(PackObject, self).__init__(name=name)
+    def __init__(self, name=None, rig=None):
+        super(PackObject, self).__init__(name=name, rig=rig)

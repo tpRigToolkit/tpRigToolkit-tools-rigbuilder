@@ -19,11 +19,11 @@ class DataImport(build.BuildObject, object):
     DESCRIPTION = 'Imports data into current DCC scene'
     ICON = 'import'
 
-    def __init__(self, name=None):
-        super(DataImport, self).__init__(name=name)
+    def __init__(self, name=None, rig=None):
+        super(DataImport, self).__init__(name=name, rig=rig)
 
     def run(self, **kwargs):
-        file_path = self.get_option('File', 'Inputs')[0]
+        file_path = self.get_option('File', 'Inputs')
         force = self.get_option('Force', 'Inputs')
         fit_view = self.get_option('Fit View', 'Inputs')
         tp.Dcc.import_file(file_path, force=force)
