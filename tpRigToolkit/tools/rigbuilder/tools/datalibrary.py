@@ -40,7 +40,7 @@ class DataLibrary(tool.DockTool, object):
         # theme = self._app.theme()
 
         if not self._data_library:
-            console = self._app.get_console()
+            console = self._app.get_console() if hasattr(self._app, 'get_console') else None
             self._data_library = datalibrary.DataLibraryWindow(project=project, console=console)
             self._data_library.setMinimumWidth(400)
             self._content_layout.addWidget(self._data_library)

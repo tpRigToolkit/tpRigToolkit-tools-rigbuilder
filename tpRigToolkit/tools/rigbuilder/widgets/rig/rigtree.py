@@ -29,11 +29,6 @@ class RigOutlinerTree(basetree.BaseTree, object):
     HEADER_LABELS = ['Rigs']
     ITEM_WIDGET = rig_item.RigItem
 
-    ICON_ON = tpDcc.ResourcesMgr().icon('box_plus')
-    ICON_OFF = tpDcc.ResourcesMgr().icon('box_minus_alt')
-    ICON_FOLDER = tpDcc.ResourcesMgr().icon('folder')
-    ICON_FOLDER_OPEN = tpDcc.ResourcesMgr().icon('open_folder')
-
     newRig = Signal(object)
     newTopRig = Signal(object)
     copyRig = Signal()
@@ -52,6 +47,10 @@ class RigOutlinerTree(basetree.BaseTree, object):
         self._current_folder = None
         self._text_edit = False
         self._context_menu = None
+        self._icon_on = tpDcc.ResourcesMgr().icon('box_plus')
+        self._icon_off = tpDcc.ResourcesMgr().icon('box_minus_alt')
+        self._icon_folder = tpDcc.ResourcesMgr().icon('folder')
+        self._icon_open = tpDcc.ResourcesMgr().icon('open_folder')
 
         super(RigOutlinerTree, self).__init__(parent=parent)
 
@@ -89,12 +88,12 @@ class RigOutlinerTree(basetree.BaseTree, object):
 
         item = self.itemFromIndex(index)
         if item.childCount() <= 0:
-            self.ICON_FOLDER.paint(painter, rect)
+            self._icon_folder.paint(painter, rect)
         else:
             if item.isExpanded():
-                self.ICON_FOLDER_OPEN.paint(painter, rect)
+                self._icon_open.paint(painter, rect)
             else:
-                self.ICON_FOLDER.paint(painter, rect)
+                self._icon_folder.paint(painter, rect)
 
     def dropEvent(self, event):
         """

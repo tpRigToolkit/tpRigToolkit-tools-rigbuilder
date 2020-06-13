@@ -94,9 +94,6 @@ class PropertiesTool(tool.DockTool, object):
             self._options_widget.get_option_object().load_options()
             self._options_widget.update_options()
 
-    def set_project(self, project):
-        pass
-
     @decorators.timestamp
     def set_object(self, object):
         self._object = object
