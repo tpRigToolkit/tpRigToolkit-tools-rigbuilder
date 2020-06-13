@@ -217,7 +217,19 @@ class BuildTree(scriptstree.ScriptTree, object):
                 child_item = item.child(i)
                 self._run_item(child_item, level, child_item.node, run_children=recursive)
 
-    def _on_run_current_item(self, external_code_library=None, group_only=False):
+    def _reset_items(self):
+
+        def _reset_item(item):
+            if hasattr(item, 'set_state'):
+                item.set_state(-1)
+                for build_level in [BuildLevel.PRE, BuildLevel.MAIN, BuildLevel.POST]:
+                    setattr(item, build_level, None)
+            for i in range(item.childCount()):
+                _reset_item(item.child(i))
+
+        _reset_item(self.invisibleRootItem())
+
+    def run_current_item(self, external_code_library=None, group_only=False):
         """
         Internal function that executes current item
         :param external_code_library:
@@ -244,8 +256,8 @@ class BuildTree(scriptstree.ScriptTree, object):
         watch = timers.StopWatch()
         watch.start(feedback=False)
 
-        for item in items:
-            item.set_state(-1)
+        self._reset_items()
+        self.repaint()
 
         if external_code_library:
             current_object.set_external_code_library(external_code_library)
@@ -288,6 +300,9 @@ class BuildTree(scriptstree.ScriptTree, object):
             tpRigToolkit.logger.info('Builder Nodes run in {} minutes and {} seconds'.format(minutes, seconds))
         else:
             tpRigToolkit.logger.info('Builder Nodes run in {} seconds'.format(seconds))
+
+    def _on_run_current_item(self, external_code_library=None, group_only=False):
+        self.run_current_item(external_code_library=external_code_library, group_only=group_only)
 
     # ================================================================================================
     # ======================== BASE
