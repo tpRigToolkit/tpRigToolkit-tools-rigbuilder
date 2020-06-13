@@ -10,7 +10,7 @@ from tpDcc.libs.qt.widgets import project
 
 import tpRigToolkit
 from tpRigToolkit.tools import rigbuilder
-from tpRigToolkit.tools.rigbuilder.core import project as project_rigbuilder, rigbuilder as core_rigbuilder
+from tpRigToolkit.tools.rigbuilder.core import consts, project as project_rigbuilder, rigbuilder as core_rigbuilder
 
 
 def reload_rigbuilder():
@@ -73,16 +73,11 @@ def solve_name(*args, **kwargs):
     :param kwargs: str
     """
 
-    use_auto_suffix = kwargs.pop('use_auto_suffix', True)
-    node_type = kwargs.get('node_type', None)
-    if use_auto_suffix and node_type:
-        auto_suffixes = tpRigToolkit.NamesMgr().get_auto_suffixes() or dict()
-        if node_type in auto_suffixes:
-            kwargs['node_type'] = auto_suffixes[node_type]
+    kwargs['unique_name'] = True
 
     solved_name = tpRigToolkit.NamesMgr().solve_name(*args, **kwargs)
 
-    return tp.Dcc.find_unique_name(solved_name)
+    return solved_name
 
 
 def parse_name(node_name, rule_name=None, ):
@@ -95,3 +90,74 @@ def parse_name(node_name, rule_name=None, ):
     """
 
     return tpRigToolkit.NamesMgr().parse_name(node_name=node_name, rule_name=rule_name)
+
+
+def get_sides():
+    """
+    Returns sides being used
+    This is the order that is used to check the list of available sides
+        1) Check if project has already a dict option called sides. Default side will be the first side in the list.
+        2) Check project nomenclature rule looking for a rule called side
+        3) Default sides for tpRigToolkit will be used
+    :return: List of sides and default one
+    :rtype: list(str), str
+    """
+
+    current_project = rigbuilder.project
+    if current_project:
+        # Check project options
+        if current_project.has_option('sides'):
+            sides = current_project.get_option('sides')
+            if sides:
+                default_side = sides[0]
+                return sides, default_side
+        # Check project nomenclature
+        name_lib = current_project.naming_lib
+        side_token = name_lib.get_token('side')
+        if side_token:
+            token_items = side_token.get_items().keys()
+            token_default = side_token.default or 1
+            token_default_value = token_items[token_default - 1] if token_items else ''
+            return token_items, token_default_value
+    else:
+        # Default fallback
+        return consts.DEFAULT_SIDES, consts.DEFAULT_SIDE
+
+
+def get_default_side():
+    """
+    Returns current default side used by the project
+    :return: str
+    """
+
+    sides, default_side = get_sides()
+
+    return default_side
+
+
+def get_color_of_side(side, sub_color=False):
+    """
+    Returns override color of the given side
+     This is the order that is used to check the list of available sides
+        1) Check if project has already side colors defined.
+        2) Default sides for DCC will be used
+    :param side: str
+    :param sub_color: fool, whether to return a sub color or not
+    :return:
+    """
+
+    current_project = rigbuilder.project
+    if current_project:
+        side_color = None
+        groups = ['Controls', 'controls'] if not sub_color else ['SubControls', 'subcontrols']
+        for group in groups:
+            if current_project.has_option(side, group=group):
+                side_color = current_project.get_option(side, group=group)
+            elif current_project.has_option(side, group=group):
+                side_color = current_project.get_option(side, group=group)
+            if side_color:
+                break
+        if side_color:
+            return side_color
+    else:
+        return tp.Dcc.get_color_of_side(side=side, sub_color=sub_color)
