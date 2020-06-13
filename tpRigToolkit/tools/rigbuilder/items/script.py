@@ -8,7 +8,6 @@ Module that contains item implementation for scripts
 from __future__ import print_function, division, absolute_import
 
 import os
-import logging
 
 from Qt.QtCore import *
 from Qt.QtWidgets import *
@@ -16,9 +15,8 @@ from Qt.QtWidgets import *
 import tpDcc
 from tpDcc.libs.python import fileio, path as path_utils
 
+import tpRigToolkit
 from tpRigToolkit.tools.rigbuilder.items import base
-
-LOGGER = logging.getLogger('tpRigToolkit')
 
 
 class ScriptItemSignals(QObject, object):
@@ -138,13 +136,13 @@ class ScriptItem(base.BaseItem, object):
 
         current_object = self.get_object()
         if not current_object:
-            LOGGER.warning('Impossible to open script because object is not defined!')
+            tpRigToolkit.logger.warning('Impossible to open script because object is not defined!')
             return
 
         code_name = self.get_code_name(remove_extension=True)
         code_file = current_object.get_code_file(code_name)
         if not code_file or not os.path.isfile(code_file):
-            LOGGER.warning('Impossible to open script "{}" because it does not exists!'.format(code_file))
+            tpRigToolkit.logger.warning('Impossible to open script "{}" because it does not exists!'.format(code_file))
             return
 
         # TODO: Add support for custom external editors
@@ -163,13 +161,13 @@ class ScriptItem(base.BaseItem, object):
 
         current_object = self.get_object()
         if not current_object:
-            LOGGER.warning('Impossible to open script because object is not defined!')
+            tpRigToolkit.logger.warning('Impossible to open script because object is not defined!')
             return
 
         code_name = self.get_code_name(remove_extension=True)
         code_file = current_object.get_code_file(code_name)
         if not code_file or not os.path.isfile(code_file):
-            LOGGER.warning('Impossible to open script "{}" because it does not exists!'.format(code_file))
+            tpRigToolkit.logger.warning('Impossible to open script "{}" because it does not exists!'.format(code_file))
             return
 
         raise NotImplementedError('open in new window functionality is not implemented yet!')

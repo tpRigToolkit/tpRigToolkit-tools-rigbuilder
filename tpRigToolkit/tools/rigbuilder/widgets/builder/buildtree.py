@@ -7,8 +7,6 @@ Module that contains widget for build tree
 
 from __future__ import print_function, division, absolute_import
 
-import logging
-
 from Qt.QtCore import *
 from Qt.QtGui import *
 
@@ -16,11 +14,16 @@ import tpDcc as tp
 from tpDcc.libs.qt.core import qtutils
 from tpDcc.libs.python import osplatform, timers, path as path_utils
 
+import tpRigToolkit
 from tpRigToolkit.tools.rigbuilder.core import utils
 from tpRigToolkit.tools.rigbuilder.items import build
 from tpRigToolkit.tools.rigbuilder.widgets.rig import scriptstree
 
-LOGGER = logging.getLogger('tpRigToolkit')
+
+class BuildLevel(object):
+    PRE = 'pre_build'
+    MAIN = 'main_build'
+    POST = 'post_build'
 
 
 class BuildTree(scriptstree.ScriptTree, object):
@@ -34,6 +37,7 @@ class BuildTree(scriptstree.ScriptTree, object):
     createNode = Signal()
     renameNode = Signal()
     itemSelected = Signal(object)
+    runFinshed = Signal()
 
     def __init__(self, settings=None, parent=None):
         super(BuildTree, self).__init__(settings=settings, parent=parent)
@@ -101,6 +105,7 @@ class BuildTree(scriptstree.ScriptTree, object):
             item.buildSignals.setBreakPoint.connect(self._on_set_break_point)
             item.buildSignals.cancelBreakPoint.connect(self._on_cancel_break_point)
             item.buildSignals.browseNode.connect(self._on_browse_code)
+            item.buildSignals.statusChanged.connect(self.repaint)
 
         self.buildSignalsConnected = True
 
@@ -115,9 +120,9 @@ class BuildTree(scriptstree.ScriptTree, object):
         item.update_node()
         self.renameNode.emit()
 
-    def _run_item(self, item, object=None, run_children=False):
+    def _run_item(self, item, run_level, object=None, run_children=False):
         """
-        Internal function that launches given ScripItem with given rig
+        Internal function that launches main run function
         :param item: ScriptItem
         :param object: object
         :param run_children: bool
@@ -126,12 +131,14 @@ class BuildTree(scriptstree.ScriptTree, object):
         if object is None:
             object = self.builder_node()
         if not object:
-            LOGGER.warning('Impossible to run script/s because builder node is not defined!')
+            tpRigToolkit.logger.warning('Impossible to run script/s because builder node is not defined!')
             return
 
         self.scrollToItem(item)
         item.set_state(4)
         item.setExpanded(True)
+
+        item.is_running = True
 
         background = item.background(0)
         orig_background = background
@@ -139,31 +146,56 @@ class BuildTree(scriptstree.ScriptTree, object):
         background.setColor(color)
         item.setBackground(0, background)
 
+        status = False
+
         try:
-            if not object.rig:
-                object.rig = item.get_object()
-            status = object.run()
-            status = status if status is not None else 'Success'
+            if not item.node.rig:
+                item.node.rig = object
+
+            if run_level == BuildLevel.PRE:
+                status = item.node.pre_run()
+            elif run_level == BuildLevel.MAIN:
+                status = item.node.post_run()
+            elif run_level == BuildLevel.POST:
+                status = item.node.run()
+
             log = osplatform.get_env_var('RIGBUILDER_LAST_TEMP_LOG')
             item.set_log(log)
 
-            if status == 'Success' or status is True:
-                item.set_state(1)
-            else:
-                item.set_state(0)
             if log.find('Warning') > -1 or log.find('WARNING') > -1 or log.find('warning') > -1:
                 item.set_state(2)
+
         except Exception as exc:
-            LOGGER.exception(exc)
+            tpRigToolkit.logger.exception(exc)
+        finally:
+            valid_status = True
+
+            if isinstance(status, list):
+                status = status[0][-1]
+
+            attr_status = bool(status == 'Success' or status is True)
+
+            setattr(item, run_level, attr_status)
+            if valid_status:
+                valid_status = attr_status
+            self.repaint()
+
+        if valid_status:
+            item.set_state(1)
+        else:
             item.set_state(0)
-            raise
+
+        item.node.rig._run_nodes[item.node.get_name()] = item.node
+
+        if not valid_status:
+            return
 
         item.setBackground(0, orig_background)
 
         if run_children:
-            self._run_children(item, object, recursive=True)
+            self._run_children(item, run_level, object, recursive=True)
 
-    def _run_children(self, item, object, recursive=True):
+    def _run_children(self, item, level, object, recursive=True):
         """
         Internal function that executes children scripts of a given item. It can be recursively or not
         :param item: ScriptItem
@@ -183,7 +215,7 @@ class BuildTree(scriptstree.ScriptTree, object):
                 child_item.set_state(-1)
             for i in range(child_count):
                 child_item = item.child(i)
-                self._run_item(child_item, child_item.node, run_children=recursive)
+                self._run_item(child_item, level, child_item.node, run_children=recursive)
 
     def _on_run_current_item(self, external_code_library=None, group_only=False):
         """
@@ -194,7 +226,7 @@ class BuildTree(scriptstree.ScriptTree, object):
 
         current_object = self.object()
         if not current_object:
-            LOGGER.warning('Impossible to run script because object is not defined!')
+            tpRigToolkit.logger.warning('Impossible to run script because object is not defined!')
             return
 
         osplatform.set_env_var('RIGBUILDER_RUN', True)
@@ -224,37 +256,38 @@ class BuildTree(scriptstree.ScriptTree, object):
             last_name = path_utils.join_path(last_path, last_name)
 
         set_end_states = False
-        for i in range(len(scripts)):
-            if osplatform.get_env_var('RIGBUILDER_RUN') == 'True':
-                if osplatform.get_env_var('RIGBULIDER_STOP') == 'True':
-                    break
-                if set_end_states:
-                    item = self._get_item_by_name(scripts[i])
-                    if item:
-                        item.set_state(-1)
-                for item in items:
-                    script_name = item.text(0)
-                    script_path = self.get_item_path(item)
-                    if script_path:
-                        script_name = path_utils.join_path(script_path, script_name)
-                    if script_name == scripts[i]:
-                        run_children = False
-                        if group_only:
-                            run_children = True
-                        self._run_item(item, item.node, run_children)
-                        if group_only:
-                            break
-                        if script_name == last_name:
-                            set_end_states = True
+        for build_level in [BuildLevel.PRE, BuildLevel.MAIN, BuildLevel.POST]:
+            for i in range(len(scripts)):
+                if osplatform.get_env_var('RIGBUILDER_RUN') == 'True':
+                    if osplatform.get_env_var('RIGBULIDER_STOP') == 'True':
+                        break
+                    if set_end_states:
+                        item = self._get_item_by_name(scripts[i])
+                        if item:
+                            item.set_state(-1)
+                    for item in items:
+                        script_name = item.text(0)
+                        script_path = self.get_item_path(item)
+                        if script_path:
+                            script_name = path_utils.join_path(script_path, script_name)
+                        if script_name == scripts[i]:
+                            run_children = False
+                            if group_only:
+                                run_children = True
+                            self._run_item(item, build_level, item.node, run_children)
+                            if group_only:
+                                break
+                            if script_name == last_name:
+                                set_end_states = True
 
         osplatform.set_env_var('RIGBUILDER_RUN', False)
         osplatform.set_env_var('RIGBULIDER_STOP', False)
 
         minutes, seconds = watch.stop()
         if minutes:
-            LOGGER.info('Builder Nodes run in {} minutes and {} seconds'.format(minutes, seconds))
+            tpRigToolkit.logger.info('Builder Nodes run in {} minutes and {} seconds'.format(minutes, seconds))
         else:
-            LOGGER.info('Builder Nodes run in {} seconds'.format(seconds))
+            tpRigToolkit.logger.info('Builder Nodes run in {} seconds'.format(seconds))
 
     # ================================================================================================
     # ======================== BASE
@@ -281,12 +314,12 @@ class BuildTree(scriptstree.ScriptTree, object):
         """
 
         if not builder_node:
-            LOGGER.warning('No builder node to create!')
+            tpRigToolkit.logger.warning('No builder node to create!')
             return
 
         current_rig = self.object()
         if not current_rig:
-            LOGGER.warning('Impossible to create new builder node because rig is not defined!')
+            tpRigToolkit.logger.warning('Impossible to create new builder node because rig is not defined!')
             return
 
         node_name = name
@@ -295,10 +328,10 @@ class BuildTree(scriptstree.ScriptTree, object):
         if not node_name:
             return
 
-        node_path = current_rig.create_build_node(builder_node=builder_node, name=node_name, description=description,
-            unique_name=True)
+        node_path = current_rig.create_build_node(
+            builder_node=builder_node, name=node_name, description=description, unique_name=True)
         if not node_path:
-            LOGGER.error('Impossible to create new node!')
+            tpRigToolkit.logger.error('Impossible to create new node!')
             return
 
         self.refresh(sync=True)

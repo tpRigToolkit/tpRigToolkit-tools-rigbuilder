@@ -56,17 +56,43 @@ class BuildObject(script.ScriptObject, object):
 
         return tpDcc.ResourcesMgr().icon(self.ICON)
 
-    def run(self, rig_object, project, *args, **kwargs):
+    def pre_run(self, *args, **kwargs):
+        """
+        Function that is executed before calling main build function
+        :param args:
+        :param kwargs:
+        :return: bool
+        """
+
+        return True
+
+    def run(*args, **kwargs):
         """
         Function that executes build function
+        :param args:
+        :param kwargs:
         :return: bool
         """
 
         return False
 
+    def post_run(self, *args, **kwargs):
+        """
+        Function that is executed after calling main build function
+        :param args:
+        :param kwargs:
+        :return: bool
+        """
+
+        return True
+
     def _get_value_from_option_type(self, value, option_type):
         if option_type == 'rigcontrol':
             value = [value, 'rigcontrol']
+        elif option_type == 'bone':
+            value = [value, 'bone']
+        elif option_type == 'boneControlLink':
+            value = [value, 'boneControlLink']
         else:
             value = super(BuildObject, self)._get_value_from_option_type(value=value, option_type=option_type)
 

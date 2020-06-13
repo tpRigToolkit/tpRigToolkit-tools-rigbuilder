@@ -36,11 +36,12 @@ class ScriptTree(basetree.BaseTree, object):
     scriptOpened = Signal(object, bool, bool)
     scriptOpenedInExternal = Signal()
 
-    python_icon = tp.ResourcesMgr().icon('python')
-    python_expand_icon = tp.ResourcesMgr().icon('python_expand')
-    python_no_expand_icon = tp.ResourcesMgr().icon('python_no_expand')
-
     def __init__(self, settings=None, parent=None):
+
+        self.python_icon = tp.ResourcesMgr().icon('python')
+        self.python_expand_icon = tp.ResourcesMgr().icon('python_expand')
+        self.python_no_expand_icon = tp.ResourcesMgr().icon('python_no_expand')
+
         super(ScriptTree, self).__init__(settings=settings, parent=parent)
 
         self.setDragDropMode(self.InternalMove)

@@ -78,8 +78,48 @@ class BuildItemsDelegate(QStyledItemDelegate, object):
                 cbx_rect = QApplication.style().subElementRect(QStyle.SE_ViewItemCheckIndicator, option_btn)
 
                 # Draw default icon
-                option_rect.setTopLeft(option_rect.topLeft() + QPoint(cbx_rect.width() + 3, 0))
-                option.icon.paint(painter, option_rect, Qt.AlignLeft | Qt.AlignVCenter,  QIcon.Normal, state)
+                if item.is_running:
+                    option_rect.setTopLeft(option_rect.topLeft() + QPoint(cbx_rect.width() + 3, 0))
+                    option.icon.paint(painter, option_rect, Qt.AlignLeft | Qt.AlignVCenter, QIcon.Normal, state)
+
+                # Draw pre/run/post build statuses
+                if item.is_running:
+                    option_rect.setTopLeft(option_rect.topLeft() + QPoint(28, 0))
+                else:
+                    option_rect.setTopLeft(option_rect.topLeft() + QPoint(cbx_rect.width() + 3, 0))
+                pre_rect = QRect(option_rect.left(), option_rect.top() + 7, 12, 12)
+                if item.pre_build:
+                    pass
+                painter.save()
+                painter.setPen(QPen(Qt.darkGray, 2))
+                if item.pre_build is False:
+                    painter.setBrush(QBrush(QColor(255, 0, 0)))
+                elif item.pre_build is True:
+                    painter.setBrush(QBrush(QColor(0, 255, 0)))
+                painter.drawEllipse(pre_rect)
+                painter.restore()
+
+                option_rect.setTopLeft(option_rect.topLeft() + QPoint(pre_rect.width() + 3, 0))
+                main_rect = QRect(option_rect.left(), option_rect.top() + 7, 12, 12)
+                painter.save()
+                painter.setPen(QPen(Qt.darkGray, 2))
+                if item.main_build is False:
+                    painter.setBrush(QBrush(QColor(255, 0, 0)))
+                elif item.main_build is True:
+                    painter.setBrush(QBrush(QColor(0, 255, 0)))
+                painter.drawEllipse(main_rect)
+                painter.restore()
+
+                option_rect.setTopLeft(option_rect.topLeft() + QPoint(main_rect.width() + 3, 0))
+                post_rect = QRect(option_rect.left(), option_rect.top() + 7, 12, 12)
+                painter.save()
+                painter.setPen(QPen(Qt.darkGray, 2))
+                if item.post_build is False:
+                    painter.setBrush(QBrush(QColor(255, 0, 0)))
+                elif item.post_build is True:
+                    painter.setBrush(QBrush(QColor(0, 255, 0)))
+                painter.drawEllipse(post_rect)
+                painter.restore()
 
                 # Draw tag text
                 default_font = painter.font()
@@ -115,10 +155,9 @@ class BuildItemsDelegate(QStyledItemDelegate, object):
                 extra_width = (tag_text_rect.width() if tag_text_rect.width() > self.MAX_TEXT_WIDTH else
                                self.MAX_TEXT_WIDTH) - tag_text_rect.width()
                 default_text_rect.setTopLeft(
-                    default_text_rect.topLeft() + QPoint(tag_rect.width() - 10 + extra_width, 0))
+                    default_text_rect.topLeft() + QPoint(tag_rect.width() - 20 + extra_width, 0))
                 painter.setFont(default_font)
                 painter.drawText(default_text_rect, Qt.AlignLeft | Qt.AlignVCenter, os.path.splitext(option.text)[0])
-
         else:
             super(BuildItemsDelegate, self).paint(painter, option, index)
 
@@ -137,13 +176,13 @@ class BuildItemsDelegate(QStyledItemDelegate, object):
         return r
 
     def _get_tag_rect(self, item_rect):
-        return QRect(item_rect.left() + 28, item_rect.top() + 2, 65, item_rect.height() - 3)
+        return QRect(item_rect.left() + 18, item_rect.top() + 2, 65, item_rect.height() - 3)
 
     def _get_icon_rect(self, item_rect):
-        return QRect(item_rect.left() + 30, item_rect.top() + 4, 20, item_rect.height() - 5)
+        return QRect(item_rect.left() + 20, item_rect.top() + 4, 20, item_rect.height() - 5)
 
     def _get_text_rect(self, item_rect):
-        return QRect(item_rect.left() + 50, item_rect.top() + 2, 35, item_rect.height() - 3)
+        return QRect(item_rect.left() + 40, item_rect.top() + 2, 35, item_rect.height() - 3)
 
 
 class BuildItemSignals(QObject, object):
@@ -161,6 +200,7 @@ class BuildItemSignals(QObject, object):
     setBreakPoint = Signal()
     cancelBreakPoint = Signal()
     browseNode = Signal()
+    statusChanged = Signal()
 
 
 class BuildItem(base.BaseItem, object):
@@ -171,6 +211,10 @@ class BuildItem(base.BaseItem, object):
         super(BuildItem, self).__init__(parent=parent)
 
         self._node = None
+        self._is_running = False
+        self._pre_build = None
+        self._main_build = None
+        self._post_build = None
 
         self.setSizeHint(0, QSize(self.sizeHint(0).width(), 26))
 
@@ -181,6 +225,41 @@ class BuildItem(base.BaseItem, object):
     @property
     def node(self):
         return self._node
+
+    @property
+    def is_running(self):
+        return self._is_running
+
+    @is_running.setter
+    def is_running(self, flag):
+        self._is_running = flag
+
+    @property
+    def pre_build(self):
+        return self._pre_build
+
+    @pre_build.setter
+    def pre_build(self, flag):
+        self._pre_build = flag
+        self.buildSignals.statusChanged.emit()
+
+    @property
+    def main_build(self):
+        return self._main_build
+
+    @main_build.setter
+    def main_build(self, flag):
+        self._main_build = flag
+        self.buildSignals.statusChanged.emit()
+
+    @property
+    def post_build(self):
+        return self._post_build
+
+    @post_build.setter
+    def post_build(self, flag):
+        self._post_build = flag
+        self.buildSignals.statusChanged.emit()
 
     # ================================================================================================
     # ======================== OVERRIDES
@@ -258,7 +337,7 @@ class BuildItem(base.BaseItem, object):
     def update_node(self):
         rig_object = self.get_object()
         item_name = self.get_name()
-        builder_node, builder_node_pkg = rig_object.get_build_node_instance(item_name)
+        builder_node = rig_object.get_build_node_instance(item_name)
         self._node = builder_node
         if self._node:
             self._node.setup_context_menu(self._context_menu)

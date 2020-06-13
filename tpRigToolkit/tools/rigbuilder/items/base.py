@@ -7,8 +7,6 @@ Module that contains base tree item implementation
 
 from __future__ import print_function, division, absolute_import
 
-import logging
-
 from Qt.QtCore import *
 from Qt.QtWidgets import *
 from Qt.QtGui import *
@@ -17,16 +15,8 @@ import tpDcc as tp
 from tpDcc.libs.python import decorators, fileio, path as path_utils
 from tpDcc.libs.qt.widgets import treewidgets
 
-LOGGER = logging.getLogger('tpRigToolkit')
-
 
 class BaseItem(treewidgets.TreeWidgetItem, object):
-
-    ok_icon = tp.ResourcesMgr().icon('ok')
-    warning_icon = tp.ResourcesMgr().icon('warning')
-    error_icon = tp.ResourcesMgr().icon('error')
-    wait_icon = tp.ResourcesMgr().icon('wait')
-
     def __init__(self, parent=None):
 
         self._log = ''
@@ -34,6 +24,11 @@ class BaseItem(treewidgets.TreeWidgetItem, object):
         self._run_state = -1
         self._context_menu = None
         self._handle_manifest = False
+
+        self.ok_icon = tp.ResourcesMgr().icon('ok')
+        self.warning_icon = tp.ResourcesMgr().icon('warning')
+        self.error_icon = tp.ResourcesMgr().icon('error')
+        self.wait_icon = tp.ResourcesMgr().icon('wait')
 
         super(BaseItem, self).__init__(parent)
 
