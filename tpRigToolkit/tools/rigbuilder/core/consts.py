@@ -30,6 +30,9 @@ OPTIONS_FILE_EXTENSION = 'json'
 PROPERTIES_FILE_NAME = 'properties'
 PROPERTIES_FILE_EXTENSION = 'json'
 
+DEFAULT_SIDES = ['center', 'left', 'right']
+DEFAULT_SIDE = 'center'
+
 PUPPET_TYPE = 'puppet'
 PUPPET_MAIN_GROUP = 'main'
 PUPPET_RIG_GROUP = 'rig'

@@ -51,6 +51,17 @@ class RigBuilderProject(project.Project, object):
 
         return rule
 
+    def find_rigs(self):
+        """
+        Returns all rigs inside current project
+        :return: list(Rig)
+        """
+
+        all_rig_paths = helpers.RigHelpers.find_rigs(self.full_path, as_full_path=True)
+        all_rigs = [helpers.RigHelpers.get_rig(rig_path) for rig_path in all_rig_paths]
+
+        return all_rigs
+
     def find_rig(self, rig_name):
         """
         Tries to find a rig inside current project
@@ -71,6 +82,15 @@ class RigBuilderProject(project.Project, object):
         if not os.path.isfile(naming_file):
             default_data = {
                 'rules': [
+                    {
+                        '_Serializable_classname': 'Rule',
+                        '_Serializable_version': '1.0',
+                        'auto_fix': False,
+                        'description': 'Default rule for names',
+                        'expression': '{description}_{side}_{id}',
+                        'iterator_format': '##',
+                        'name': 'default'
+                    },
                     {
                         '_Serializable_classname': 'Rule',
                         '_Serializable_version': '1.0',

@@ -65,7 +65,7 @@ class SkeletonFileData(data.CustomData, object):
         root_node = root_nodes[0]
 
         skeleton_data = list()
-        child_nodes = tp.Dcc.list_children(root_node)
+        child_nodes = tp.Dcc.list_children(root_node, children_type='transform')
         child_nodes.insert(0, root_node)
 
         visited_nodes = dict()
@@ -74,6 +74,7 @@ class SkeletonFileData(data.CustomData, object):
             node_short_name = tp.Dcc.node_short_name(node)
             node_data['name'] = node_short_name
             node_data['index'] = i
+            node_data['type'] = tp.Dcc.node_type(node)
             visited_nodes[node_short_name] = i
             world_matrix = tp.Dcc.node_world_matrix(node)
             node_data['world_matrix'] = world_matrix
@@ -124,12 +125,16 @@ class SkeletonFileData(data.CustomData, object):
             node_index = node_data.get('index', 0)
             node_parent_index = node_data.get('parent_index', -1)
             node_name = node_data.get('name', 'new_node')
+            node_type = node_data.get('type', 'joint')
             node_world_matrix = node_data.get(
                 'world_matrix', [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0])
             tp.Dcc.clear_selection()
-            new_jnt = tp.Dcc.create_joint(joint_name=node_name)
-            tp.Dcc.set_node_world_matrix(new_jnt, node_world_matrix)
-            created_nodes[node_index] = {'node': new_jnt, 'parent_index': node_parent_index}
+            if node_type == 'joint':
+                new_node = tp.Dcc.create_joint(joint_name=node_name)
+            else:
+                new_node = tp.Dcc.create_empty_group(name=node_name)
+            tp.Dcc.set_node_world_matrix(new_node, node_world_matrix)
+            created_nodes[node_index] = {'node': new_node, 'parent_index': node_parent_index}
 
         for node_index, node_data in created_nodes.items():
             parent_index = node_data['parent_index']
@@ -156,8 +161,10 @@ class Skeleton(rigbulder_data.DataItem, object):
     Extensions = ['.{}'.format(SkeletonFileData.get_data_extension())]
     MenuOrder = 5
     MenuName = SkeletonFileData.get_data_title()
-    MenuIconPath = tp.ResourcesMgr().get('icons', 'skeleton.png')
-    TypeIconPath = tp.ResourcesMgr().get('icons', 'skeleton.png')
+    MenuIconName = 'skeleton.png'
+    TypeIconName = 'skeleton.png'
+
+    TypeIconName = 'skeleton.png'
     DataType = SkeletonFileData.get_data_type()
     DefaultDataFileName = 'new_skeleton_file'
     PreviewWidgetClass = SkeletonPreviewWidget
