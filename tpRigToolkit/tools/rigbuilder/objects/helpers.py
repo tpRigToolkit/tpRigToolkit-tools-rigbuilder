@@ -148,16 +148,18 @@ class ObjectsHelpers(object):
 class ScriptHelpers(ObjectsHelpers, object):
 
     @staticmethod
-    def get_code_builtins(build_object, rig_object=None, character_object=None):
+    def get_code_builtins(build_object, rig_object=None, project=None):
         """
         Returns all current code builtins of the given script object
         :param build_object: BuildObject
+        :param rig_object: RigObject
+        :param project: RigBuilderProject
         :return: dict
         """
 
         builtins = {
             'node': build_object, 'show': ObjectsHelpers.show, 'warning': ObjectsHelpers.warning,
-            'error': ObjectsHelpers.error, 'rig': rig_object, 'character': character_object}
+            'error': ObjectsHelpers.error, 'rig': rig_object, 'project': project}
         if tp.is_maya():
             import maya.cmds as cmds
             # import pymel.all as pymel
@@ -185,15 +187,16 @@ class ScriptHelpers(ObjectsHelpers, object):
             exec '__builtin__.%s = builtin_value' % builtin
 
     @staticmethod
-    def reset_code_bultins(script_object, rig_object=None, character_object=None):
+    def reset_code_bultins(script_object, rig_object=None, project=None):
         """
         Reset given rig builtins
         :param script_object: ScriptObject
-        :param character_object: ScriptObject
+        :param rig_object: RigObject
+        :param project: RigBuilderProject
         """
 
         builtins = ScriptHelpers.get_code_builtins(
-            script_object, rig_object=rig_object, character_object=character_object)
+            script_object, rig_object=rig_object, project=project)
         for builtin in builtins:
             try:
                 exec ('del(__builtin__.{}'.format(builtin))

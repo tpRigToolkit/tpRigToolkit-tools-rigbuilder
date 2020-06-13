@@ -111,8 +111,11 @@ class RigObject(script.ScriptObject, object):
             node_path = path_utils.remove_common_path_at_beginning(code_path, script)
             node_name = os.path.dirname(node_path)
             builder_node_inst, builder_node_pkg = self.get_build_node_instance(node_name)
-            init_passed = builder_node_inst.run()
-            self._run_nodes[node_name] = [builder_node_inst, builder_node_pkg]
+            init_passed = False
+            if builder_node_inst:
+                init_passed = builder_node_inst.run()
+                self._run_nodes[node_name] = builder_node_inst
+
             return builder_node_pkg, init_passed, init_passed
 
     def _reset(self):
@@ -417,17 +420,17 @@ class RigObject(script.ScriptObject, object):
         if not node_class:
             tpRigToolkit.logger.warning(
                 'Impossible to retrieve builder node with class: "{}" for "{}"'.format(node_class, node_name))
-            return None, None
+            return None
         node_package = node_info.get('package', None)
         if not node_package:
             tpRigToolkit.logger.warning(
                 'Impossible to retrieve builder node from package: "{}" for "{}"'.format(node_class, node_name))
-            return None, None
+            return None
 
         pkg = rigbuilder.PkgsMgr().get_package_by_name(node_package)
         if not pkg:
             tpRigToolkit.logger.warning('No package with name "{}" found!'.format(node_package))
-            return None, None
+            return None
 
         builder_node_class = pkg.get_builder_node_class_by_name(node_class)
         if not builder_node_class:
@@ -441,7 +444,7 @@ class RigObject(script.ScriptObject, object):
         # We force the creation of the options file
         builder_node.get_option_file()
 
-        return builder_node, pkg
+        return builder_node
 
     def get_node_info(self, node_name):
         """

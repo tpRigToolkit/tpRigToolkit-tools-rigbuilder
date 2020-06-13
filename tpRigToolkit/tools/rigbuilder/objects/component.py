@@ -31,10 +31,9 @@ class RigComponent(build.BuildObject, object):
         setup_options['Inputs'] = {'value': True, 'group': None, 'type': 'group'}
         setup_options['Component Description'] = {'value': 'component', 'group': 'Inputs', 'type': 'string'}
         setup_options['Size'] = {'value': 1.0, 'group': 'Inputs', 'type': 'float'}
-        setup_options['Joints'] = {'value': [], 'group': 'Inputs', 'type': 'list'}
-        setup_options['Joints Name Rule'] = {'value': '', 'group': 'Inputs', 'type': 'string'}
         setup_options['Control Size'] = {'value': 1.0, 'group': 'Inputs', 'type': 'float'}
         setup_options['Mirror'] = {'value': False, 'group': 'Inputs', 'type': 'bool'}
+        setup_options['Use Side Colors'] = {'value': True, 'group': 'Inputs', 'type': 'bool'}
 
         return setup_options
 
@@ -83,6 +82,37 @@ class RigComponent(build.BuildObject, object):
         parent_path = '/'.join(current_path.split('/')[:-1])
         rig_path = self._rig.get_code_path()
         parent_component_name = path_utils.clean_path(os.path.relpath(parent_path, rig_path))
-        parent_component, parent_component_package = self._rig.get_build_node_instance(parent_component_name)
+        parent_component = self._rig.get_build_node_instance(parent_component_name)
 
         return parent_component
+
+    def get_controls_group(self):
+        """
+        Returns controls group this component should use
+        If the rig component is attached to a parent component, parent component controls group will be used
+        :return: str
+        """
+
+        controls_grp = 'controls'
+        parent_component = self.get_parent_component()
+        if parent_component:
+            if hasattr(parent_component, 'controls_group'):
+                controls_grp = parent_component.controls_group
+
+        return controls_grp
+
+    def get_setup_group(self):
+        """
+        Returns setup group this component should use
+        If the rig component is attached to a parent component, parent component setup group will be used
+        :return: str
+        """
+
+        setup_grp = 'setup'
+        parent_component = self.get_parent_component()
+        if parent_component:
+            if hasattr(parent_component, 'setup_group'):
+                setup_grp = parent_component.controls_group
+
+        return setup_grp
+

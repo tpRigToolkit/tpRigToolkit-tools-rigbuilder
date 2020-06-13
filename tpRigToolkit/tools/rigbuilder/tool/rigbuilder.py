@@ -34,8 +34,9 @@ class RigBuilder(window.BaseWindow, object):
         self._project_to_open = project_name
 
         self._projects_widget = project.ProjectWidget()
-        self._console = console.Console()
-        self._hub_widget = hub.HubWidget(settings=settings, console=self._console)
+        # self._console = console.Console()
+        self._hub_widget = hub.HubWidget(settings=settings)
+        # self._hub_widget = hub.HubWidget(settings=settings, console=self._console)
         self._project_settings_widget = project.ProjectSettingsWidget()
         self._toolbar = None
         self._progress_toolbar = None
@@ -44,17 +45,17 @@ class RigBuilder(window.BaseWindow, object):
 
         self._projects_widget.set_settings(self._settings)
         self._hub_widget.set_settings(self._settings)
-
-        self._console_dock = self.add_dock('Console', widget=self._console, pos=Qt.BottomDockWidgetArea, tabify=False)
-        self._console_dock.setVisible(False)
-
+    #
+    #     self._console_dock = self.add_dock('Console', widget=self._console, pos=Qt.BottomDockWidgetArea, tabify=False)
+    #     self._console_dock.setVisible(False)
+    #
         self._toolbar = self._setup_toolbar()
-        self._progress_toolbar = self._setup_progress_bar()
-        self._hub_widget.set_progress_bar(self._progress_toolbar)
+    #     self._progress_toolbar = self._setup_progress_bar()
+    #     self._hub_widget.set_progress_bar(self._progress_toolbar)
         self._setup_menubar()
 
         self._toolbar.setVisible(False)
-        self._progress_toolbar.setVisible(False)
+    #     self._progress_toolbar.setVisible(False)
         self.menuBar().setVisible(False)
 
         self._register_tools()
@@ -64,14 +65,14 @@ class RigBuilder(window.BaseWindow, object):
     def ui(self):
         super(RigBuilder, self).ui()
 
-        self._stack = stack.SlidingStackedWidget()
+        self._stack = stack.SlidingOpacityStackedWidget()
         self.main_layout.addWidget(self._stack)
 
         self._stack.addWidget(self._projects_widget)
         self._stack.addWidget(self._hub_widget)
         self._stack.addWidget(self._project_settings_widget)
-
-        self._console.setVisible(False)
+    #
+    #     self._console.setVisible(False)
 
     def setup_signals(self):
         self._projects_widget.projectOpened.connect(self._on_open_project)
@@ -114,18 +115,18 @@ class RigBuilder(window.BaseWindow, object):
         self.set_project(project_to_open)
         self._open_project_widget()
 
-    # ============================================================================================================
-    # CONSOLE
-    # ============================================================================================================
-
-    def get_console(self):
-        """
-        Returns console widget
-        :return: Console
-        """
-
-        return self._console
-
+    # # ============================================================================================================
+    # # CONSOLE
+    # # ============================================================================================================
+    #
+    # def get_console(self):
+    #     """
+    #     Returns console widget
+    #     :return: Console
+    #     """
+    #
+    #     return self._console
+    #
     # ============================================================================================================
     # INTERNAL
     # ============================================================================================================
@@ -144,36 +145,36 @@ class RigBuilder(window.BaseWindow, object):
         self._project_options_action.setIcon(QIcon(self._project.get_project_image()))
         self._project_options_action.setText(self._project.name.title())
 
-        self._console.setVisible(True)
-        self._console_dock.setVisible(True)
-        self._console.clear()
-        self._console.write('>> Opening Project: {} ...'.format(self._project.name))
+    #     self._console.setVisible(True)
+    #     self._console_dock.setVisible(True)
+    #     self._console.clear()
+    #     self._console.write('>> Opening Project: {} ...'.format(self._project.name))
         self._toolbar.setVisible(True)
         self.menuBar().setVisible(True)
-        self._progress_toolbar.setVisible(False)
-        self._stack.slide_in_index(1)
-        self._console.write_ok('>> Project {} opened successfully!'.format(self._project.name))
+    #     self._progress_toolbar.setVisible(False)
+        self._stack.setCurrentWidget(self._hub_widget)
+        # self._console.write_ok('>> Project {} opened successfully!'.format(self._project.name))
 
-    def _open_projects_widget(self):
-        """
-        Internal function that opens project selector widget
-        """
-
-        self._console.setVisible(False)
-        self._console_dock.setVisible(False)
-        self._console.clear()
-        self.set_project(None)
-        self._toolbar.setVisible(False)
-        self.menuBar().setVisible(False)
-        self._progress_toolbar.setVisible(False)
-        self._stack.slide_in_index(0)
+    # def _open_projects_widget(self):
+    #     """
+    #     Internal function that opens project selector widget
+    #     """
+    #
+    #     self._console.setVisible(False)
+    #     self._console_dock.setVisible(False)
+    #     self._console.clear()
+    #     self.set_project(None)
+    #     self._toolbar.setVisible(False)
+    #     self.menuBar().setVisible(False)
+    #     self._progress_toolbar.setVisible(False)
+    #     self._stack.slide_in_index(0)
 
     def _open_project_options(self):
         if not self._project:
             tpRigToolkit.logger.warning('Impossible to open project settings. Project is not defined.')
             return False
 
-        self._stack.slide_in_index(2)
+        self._stack.setCurrentWidget(self._project_settings_widget)
         self._toolbar.setVisible(False)
         self.menuBar().setVisible(False)
 
@@ -211,53 +212,53 @@ class RigBuilder(window.BaseWindow, object):
         toolbar.addWidget(browse_btn)
 
         project_options_btn.clicked.connect(self._on_open_project_options)
-        run_build_btn.clicked.connect(self._on_run_build)
+        # run_build_btn.clicked.connect(self._on_run_build)
 
         return toolbar
 
-    def _setup_progress_bar(self):
-        """
-        Internal function used to setup RigBuilder progress bar widget
-        """
-
-        progress_toolbar = self.add_toolbar(name='ProgressToolBar')
-        progress_toolbar.setAllowedAreas(Qt.TopToolBarArea | Qt.BottomToolBarArea)
-        continue_icon = tpDcc.ResourcesMgr().icon('resume')
-        stop_icon = tpDcc.ResourcesMgr().icon('stop')
-        self._stop_btn = QToolButton()
-        self._stop_btn.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
-        stop_action = QAction(stop_icon, 'Stop (Hold ESC)', self._stop_btn)
-        self._stop_btn.setDefaultAction(stop_action)
-        self._stop_btn.setEnabled(False)
-        self._continue_btn = QToolButton()
-        self._continue_btn.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
-        continue_action = QAction(continue_icon, 'Continue', self._continue_btn)
-        self._continue_btn.setDefaultAction(continue_action)
-        self._continue_btn.setEnabled(False)
-        progress_widget = QWidget()
-        progress_layout = QVBoxLayout()
-        progress_layout.setContentsMargins(2, 2, 2, 2)
-        progress_layout.setSpacing(2)
-        progress_layout.setAlignment(Qt.AlignCenter)
-        progress_widget.setLayout(progress_layout)
-        self.progress_bar = QProgressBar()
-        self._progress_bar_text = QLabel('-')
-        progress_layout.addWidget(self.progress_bar)
-        progress_layout.addLayout(dividers.DividerLayout())
-        progress_text_layout = QHBoxLayout()
-        progress_text_layout.setContentsMargins(0, 0, 0, 0)
-        progress_text_layout.setSpacing(0)
-        progress_text_layout.addItem(QSpacerItem(10, 0, QSizePolicy.Expanding, QSizePolicy.Fixed))
-        progress_text_layout.addWidget(self._progress_bar_text)
-        progress_text_layout.addItem(QSpacerItem(10, 0, QSizePolicy.Expanding, QSizePolicy.Fixed))
-        progress_layout.addLayout(progress_text_layout)
-
-        progress_toolbar.addWidget(self._stop_btn)
-        progress_toolbar.addWidget(self._continue_btn)
-        progress_toolbar.addSeparator()
-        progress_toolbar.addWidget(progress_widget)
-
-        return progress_toolbar
+    # def _setup_progress_bar(self):
+    #     """
+    #     Internal function used to setup RigBuilder progress bar widget
+    #     """
+    #
+    #     progress_toolbar = self.add_toolbar(name='ProgressToolBar')
+    #     progress_toolbar.setAllowedAreas(Qt.TopToolBarArea | Qt.BottomToolBarArea)
+    #     continue_icon = tpDcc.ResourcesMgr().icon('resume')
+    #     stop_icon = tpDcc.ResourcesMgr().icon('stop')
+    #     self._stop_btn = QToolButton()
+    #     self._stop_btn.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+    #     stop_action = QAction(stop_icon, 'Stop (Hold ESC)', self._stop_btn)
+    #     self._stop_btn.setDefaultAction(stop_action)
+    #     self._stop_btn.setEnabled(False)
+    #     self._continue_btn = QToolButton()
+    #     self._continue_btn.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+    #     continue_action = QAction(continue_icon, 'Continue', self._continue_btn)
+    #     self._continue_btn.setDefaultAction(continue_action)
+    #     self._continue_btn.setEnabled(False)
+    #     progress_widget = QWidget()
+    #     progress_layout = QVBoxLayout()
+    #     progress_layout.setContentsMargins(2, 2, 2, 2)
+    #     progress_layout.setSpacing(2)
+    #     progress_layout.setAlignment(Qt.AlignCenter)
+    #     progress_widget.setLayout(progress_layout)
+    #     self.progress_bar = QProgressBar()
+    #     self._progress_bar_text = QLabel('-')
+    #     progress_layout.addWidget(self.progress_bar)
+    #     progress_layout.addLayout(dividers.DividerLayout())
+    #     progress_text_layout = QHBoxLayout()
+    #     progress_text_layout.setContentsMargins(0, 0, 0, 0)
+    #     progress_text_layout.setSpacing(0)
+    #     progress_text_layout.addItem(QSpacerItem(10, 0, QSizePolicy.Expanding, QSizePolicy.Fixed))
+    #     progress_text_layout.addWidget(self._progress_bar_text)
+    #     progress_text_layout.addItem(QSpacerItem(10, 0, QSizePolicy.Expanding, QSizePolicy.Fixed))
+    #     progress_layout.addLayout(progress_text_layout)
+    #
+    #     progress_toolbar.addWidget(self._stop_btn)
+    #     progress_toolbar.addWidget(self._continue_btn)
+    #     progress_toolbar.addSeparator()
+    #     progress_toolbar.addWidget(progress_widget)
+    #
+    #     return progress_toolbar
 
     def _setup_menubar(self):
         """
@@ -342,5 +343,5 @@ class RigBuilder(window.BaseWindow, object):
 
         self._open_project_options()
 
-    def _on_run_build(self):
-        print('RUNNING BUILD ...')
+    # def _on_run_build(self):
+    #     print('RUNNING BUILD ...')

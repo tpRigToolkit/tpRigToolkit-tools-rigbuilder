@@ -305,6 +305,8 @@ class ScriptObject(base.BaseObject, object):
                     if hasattr(module, 'main'):
                         module.main()
                         status = ScriptStatus.SUCCESS
+                    else:
+                        status = ScriptStatus.SUCCESS
                 except Exception:
                     status = traceback.format_exc()
                     self._reset_builtin(**kwargs)

@@ -12,6 +12,7 @@ import os
 import tpDcc
 from tpDcc.libs.python import fileio, path as path_utils
 
+from tpRigToolkit.tools import rigbuilder
 from tpRigToolkit.tools.rigbuilder.objects import build
 
 
@@ -25,11 +26,12 @@ class PythonScript(build.BuildObject, object):
     def __init__(self, name=None, rig=None):
         super(PythonScript, self).__init__(name=name, rig=rig)
 
-    def run(self, **kwargs):
+    def run(self, *args, **kwargs):
         self._create_python_file()
         python_file = self.get_python_file()
-
-        return self.run_script(python_file, **kwargs)
+        rig_object = self.rig
+        project = rigbuilder.project
+        return self.run_script(python_file, rig_object=rig_object, project=project, **kwargs)
 
     def get_python_file(self):
         """
