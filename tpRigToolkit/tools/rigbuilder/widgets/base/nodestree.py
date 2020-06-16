@@ -25,12 +25,37 @@ class BuilderNodesTree(base.BaseWidget, object):
     def ui(self):
         super(BuilderNodesTree, self).ui()
 
+        splitter = QSplitter()
+        splitter.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        main_widget = QWidget()
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        main_widget.setLayout(main_layout)
+
         self._nodes_searcher = search.SearchFindWidget()
         self._nodes_tree = QTreeWidget()
+        self._nodes_tree.setHeaderHidden(True)
         self._nodes_tree.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        main_layout.addWidget(self._nodes_searcher)
+        main_layout.addWidget(self._nodes_tree)
 
-        self.main_layout.addWidget(self._nodes_searcher)
-        self.main_layout.addWidget(self._nodes_tree)
+        extra_widget = QWidget()
+        extra_layout = QVBoxLayout()
+        extra_layout.setContentsMargins(0, 0, 0, 0)
+        extra_layout.setSpacing(0)
+        extra_widget.setLayout(extra_layout)
+        self._node_description = QTextEdit()
+        self._node_description.setPlaceholderText('Node description ...')
+        self._node_description.setReadOnly(True)
+        extra_layout.addWidget(self._node_description)
+
+        splitter.addWidget(main_widget)
+        splitter.addWidget(extra_widget)
+
+        self.main_layout.addWidget(splitter)
+
 
     def selected_builder_node(self):
         selected_items = self._nodes_tree.selectedItems()
