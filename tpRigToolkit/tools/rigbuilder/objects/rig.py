@@ -110,13 +110,13 @@ class RigObject(script.ScriptObject, object):
             code_path = self.get_code_path()
             node_path = path_utils.remove_common_path_at_beginning(code_path, script)
             node_name = os.path.dirname(node_path)
-            builder_node_inst, builder_node_pkg = self.get_build_node_instance(node_name)
+            builder_node_inst = self.get_build_node_instance(node_name)
             init_passed = False
             if builder_node_inst:
                 init_passed = builder_node_inst.run()
                 self._run_nodes[node_name] = builder_node_inst
 
-            return builder_node_pkg, init_passed, init_passed
+            return None, init_passed, init_passed
 
     def _reset(self):
         """

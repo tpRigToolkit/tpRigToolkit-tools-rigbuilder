@@ -293,31 +293,34 @@ class ScriptObject(base.BaseObject, object):
             if hard_error:
                 tp.Dcc.disable_undo()
                 self._reset_builtin(**kwargs)
-                try:
-                    del module
-                except Exception:
-                    LOGGER.warning('Could not delete module: {}!'.format(module))
-                LOGGER.error('{}\n'.format(status))
-                raise
+                if module:
+                    try:
+                        del module
+                    except Exception:
+                        LOGGER.warning('Could not delete module: {}!'.format(module))
+                    LOGGER.error('{}\n'.format(status))
+                    raise
         finally:
             if init_passed:
-                try:
-                    if hasattr(module, 'main'):
-                        module.main()
-                        status = ScriptStatus.SUCCESS
-                    else:
-                        status = ScriptStatus.SUCCESS
-                except Exception:
-                    status = traceback.format_exc()
-                    self._reset_builtin(**kwargs)
-                    if hard_error:
-                        tp.Dcc.disable_undo()
-                        LOGGER.error('{}\n'.format(status))
-                        raise
+                if module:
+                    try:
+                        if hasattr(module, 'main'):
+                            module.main()
+                            status = ScriptStatus.SUCCESS
+                        else:
+                            status = ScriptStatus.SUCCESS
+                    except Exception:
+                        status = traceback.format_exc()
+                        self._reset_builtin(**kwargs)
+                        if hard_error:
+                            tp.Dcc.disable_undo()
+                            LOGGER.error('{}\n'.format(status))
+                            raise
 
             tp.Dcc.disable_undo()
 
-        del module
+        if module:
+            del module
         self._reset_builtin(**kwargs)
 
         if not status == ScriptStatus.SUCCESS:

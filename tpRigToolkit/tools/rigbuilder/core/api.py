@@ -13,14 +13,6 @@ from tpRigToolkit.tools import rigbuilder
 from tpRigToolkit.tools.rigbuilder.core import consts, project as project_rigbuilder, rigbuilder as core_rigbuilder
 
 
-def reload_rigbuilder():
-    """
-    Reloads rigbuilder tool
-    """
-
-    tp.ToolsMgr().get_tool_by_id('tpRigToolkit-tools-rigbuilder', do_reload=True)
-
-
 def get_project_by_name(projects_path, project_name):
     """
     Returns a project located in the given path and with the given name (if exists)
