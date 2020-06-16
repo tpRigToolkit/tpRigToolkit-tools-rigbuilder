@@ -97,7 +97,10 @@ class PropertiesTool(tool.DockTool, object):
     @decorators.timestamp
     def set_object(self, object):
         self._object = object
-        self._stack.slide_in_index(1)
+        if not self._object:
+            self._stack.slide_in_index(0)
+        else:
+            self._stack.slide_in_index(1)
 
     def _on_refresh(self, index):
         if index == 2:
