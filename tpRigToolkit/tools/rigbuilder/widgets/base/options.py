@@ -14,6 +14,7 @@ from Qt.QtCore import *
 from Qt.QtWidgets import *
 
 import tpDcc as tp
+from tpDcc.libs.python import python
 from tpDcc.libs.qt.core import base
 from tpDcc.libs.qt.widgets import layouts, label, lineedit, buttons, options, dividers
 
@@ -48,6 +49,8 @@ class RigBuilderOptionList(options.OptionList, object):
             self.add_control_rig(name=name, value=value, parent=parent)
         if option_type == 'bone':
             self.add_bone(name=name, value=value, parent=parent)
+        elif option_type == 'boneList':
+            self.add_bone_list(name=name, value=value, parent=parent)
         elif option_type == 'boneControlLink':
             self.add_control_bone_link(name=name, value=value, parent=parent)
 
@@ -61,6 +64,14 @@ class RigBuilderOptionList(options.OptionList, object):
     def add_bone(self, name='bone', value=None, parent=None):
         name = self._get_unique_name(name, parent)
         bone_widget = BoneOption(name=name, parent=parent, main_widget=self._parent)
+        bone_widget.set_value(value)
+        self._handle_parenting(bone_widget, parent)
+        self._write_options(clear=False)
+
+    def add_bone_list(self, name='boneList', value=None, parent=None):
+        value = python.force_list(value)
+        name = self._get_unique_name(name, parent)
+        bone_widget = BoneOptionList(name=name, parent=parent, main_widget=self._parent)
         bone_widget.set_value(value)
         self._handle_parenting(bone_widget, parent)
         self._write_options(clear=False)
@@ -131,6 +142,14 @@ class BoneOption(options.Option, object):
 
     def _setup_option_widget_value_change(self):
         self._option_widget.textChanged.connect(self._on_value_changed)
+
+
+class BoneOptionList(options.ListOption, object):
+    def __init__(self, name, parent, main_widget):
+        super(BoneOptionList, self).__init__(name=name, parent=parent, main_widget=main_widget)
+
+    def get_option_type(self):
+        return 'boneList'
 
 
 class GetControlRigWidget(base.BaseWidget, object):

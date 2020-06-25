@@ -91,6 +91,8 @@ class BuildObject(script.ScriptObject, object):
             value = [value, 'rigcontrol']
         elif option_type == 'bone':
             value = [value, 'bone']
+        elif option_type == 'boneList':
+            value = [value, 'boneList']
         elif option_type == 'boneControlLink':
             value = [value, 'boneControlLink']
         else:

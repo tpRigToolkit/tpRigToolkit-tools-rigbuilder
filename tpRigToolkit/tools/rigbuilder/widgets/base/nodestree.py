@@ -17,6 +17,9 @@ from tpRigToolkit.tools import rigbuilder
 
 
 class BuilderNodesTree(base.BaseWidget, object):
+
+    nodeSelected = Signal()
+
     def __init__(self, parent=None):
         super(BuilderNodesTree, self).__init__(parent=parent)
 
@@ -56,6 +59,8 @@ class BuilderNodesTree(base.BaseWidget, object):
 
         self.main_layout.addWidget(splitter)
 
+    def setup_signals(self):
+        self._nodes_tree.itemSelectionChanged.connect(self._on_node_selected)
 
     def selected_builder_node(self):
         selected_items = self._nodes_tree.selectedItems()
@@ -70,6 +75,7 @@ class BuilderNodesTree(base.BaseWidget, object):
     def refresh(self):
         self._fill_nodes()
         self._nodes_tree.expandAll()
+        self._node_description.setText('')
 
     def _fill_nodes(self):
         self._nodes_tree.clear()
@@ -84,3 +90,11 @@ class BuilderNodesTree(base.BaseWidget, object):
                 node_item.setText(0, node_name)
                 node_item.setData(0, Qt.UserRole, node_class)
                 pkg_item.addChild(node_item)
+
+    def _on_node_selected(self):
+        self._node_description.setText('')
+        selected_node = self.selected_builder_node()
+        if not selected_node:
+            return
+
+        self._node_description.setPlainText(selected_node.DESCRIPTION)

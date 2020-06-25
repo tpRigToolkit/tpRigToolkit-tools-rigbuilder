@@ -291,11 +291,9 @@ class BaseItem(treewidgets.TreeWidgetItem, object):
 
         if not item:
             return False
-        if not hasattr(item, 'name'):
+        if not hasattr(item, 'get_name') or not hasattr(self, 'get_path'):
             return False
-        if not hasattr(item, 'directory'):
-            return False
-        if item.name == self._name and item.get_directory() == self._directory:
+        if item.get_name() == self.get_name() and item.get_path() == self.get_path():
             return True
 
         return False

@@ -32,6 +32,7 @@ PROPERTIES_FILE_EXTENSION = 'json'
 
 DEFAULT_SIDES = ['center', 'left', 'right']
 DEFAULT_SIDE = 'center'
+DEFAULT_MIRROR_SIDE = 'right'
 
 PUPPET_TYPE = 'puppet'
 PUPPET_MAIN_GROUP = 'main'
@@ -69,6 +70,15 @@ PUPPET_MAIN_GUIDE = '{}_{}'.format(PUPPET_MAIN_GUIDE_NAME, PUPPET_GUIDE)
 PUPPET_ROOT_GUIDE = '{}_{}'.format(PUPPET_ROOT_GUIDE_NAME, PUPPET_GUIDE)
 PUPPET_MAIN_GUIDE_CLUSTER = '{}_cluster'.format(PUPPET_MAIN_GUIDE)
 PUPPET_METADATA_FILE = 'metadata.yml'
+
+class BuildLevel(object):
+    """
+    Class that defines all available build levels for build nodes
+    """
+
+    PRE = 'pre_build'
+    MAIN = 'main_build'
+    POST = 'post_build'
 
 
 class DataTypes(object):

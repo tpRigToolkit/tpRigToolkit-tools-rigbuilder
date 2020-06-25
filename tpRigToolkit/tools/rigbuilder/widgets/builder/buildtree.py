@@ -15,15 +15,9 @@ from tpDcc.libs.qt.core import qtutils
 from tpDcc.libs.python import osplatform, timers, path as path_utils
 
 import tpRigToolkit
-from tpRigToolkit.tools.rigbuilder.core import utils
+from tpRigToolkit.tools.rigbuilder.core import utils, consts
 from tpRigToolkit.tools.rigbuilder.items import build
 from tpRigToolkit.tools.rigbuilder.widgets.rig import scriptstree
-
-
-class BuildLevel(object):
-    PRE = 'pre_build'
-    MAIN = 'main_build'
-    POST = 'post_build'
 
 
 class BuildTree(scriptstree.ScriptTree, object):
@@ -37,7 +31,7 @@ class BuildTree(scriptstree.ScriptTree, object):
     createNode = Signal()
     renameNode = Signal()
     itemSelected = Signal(object)
-    runFinshed = Signal()
+    runFinished = Signal()
 
     def __init__(self, settings=None, parent=None):
         super(BuildTree, self).__init__(settings=settings, parent=parent)
@@ -152,12 +146,12 @@ class BuildTree(scriptstree.ScriptTree, object):
             if not item.node.rig:
                 item.node.rig = object
 
-            if run_level == BuildLevel.PRE:
+            if run_level == consts.BuildLevel.PRE:
                 status = item.node.pre_run()
-            elif run_level == BuildLevel.MAIN:
-                status = item.node.post_run()
-            elif run_level == BuildLevel.POST:
+            elif run_level == consts.BuildLevel.MAIN:
                 status = item.node.run()
+            elif run_level == consts.BuildLevel.POST:
+                status = item.node.post_run()
 
             log = osplatform.get_env_var('RIGBUILDER_LAST_TEMP_LOG')
             item.set_log(log)
@@ -218,11 +212,10 @@ class BuildTree(scriptstree.ScriptTree, object):
                 self._run_item(child_item, level, child_item.node, run_children=recursive)
 
     def _reset_items(self):
-
         def _reset_item(item):
             if hasattr(item, 'set_state'):
                 item.set_state(-1)
-                for build_level in [BuildLevel.PRE, BuildLevel.MAIN, BuildLevel.POST]:
+                for build_level in [consts.BuildLevel.PRE, consts.BuildLevel.MAIN, consts.BuildLevel.POST]:
                     setattr(item, build_level, None)
             for i in range(item.childCount()):
                 _reset_item(item.child(i))
@@ -268,7 +261,7 @@ class BuildTree(scriptstree.ScriptTree, object):
             last_name = path_utils.join_path(last_path, last_name)
 
         set_end_states = False
-        for build_level in [BuildLevel.PRE, BuildLevel.MAIN, BuildLevel.POST]:
+        for build_level in [consts.BuildLevel.PRE, consts.BuildLevel.MAIN, consts.BuildLevel.POST]:
             for i in range(len(scripts)):
                 if osplatform.get_env_var('RIGBUILDER_RUN') == 'True':
                     if osplatform.get_env_var('RIGBULIDER_STOP') == 'True':
@@ -308,6 +301,26 @@ class BuildTree(scriptstree.ScriptTree, object):
     # ======================== BASE
     # ================================================================================================
 
+    def get_all_builder_nodes(self):
+        """
+        Returns all available build nodes
+        :return: list
+        """
+
+        def _get_subtree_nodes(tree_widget_item):
+            nodes = list()
+            nodes.append(tree_widget_item)
+            for i in range(tree_widget_item.childCount()):
+                nodes.extend(_get_subtree_nodes(tree_widget_item.child(i)))
+
+            return nodes
+
+        all_items = []
+        for i in range(self.topLevelItemCount()):
+            top_item = self.topLevelItem(i)
+            all_items.extend(_get_subtree_nodes(top_item))
+        return all_items
+
     def builder_node(self):
         """
         Returns current selected builder node
@@ -320,7 +333,7 @@ class BuildTree(scriptstree.ScriptTree, object):
 
         return current_nodes[0]
 
-    def create_builder_node(self, builder_node, name=None, description=None):
+    def create_builder_node(self, builder_node, name=None):
         """
         Function that creates a new builder node of the current selected node
         :param builder_node:
@@ -343,8 +356,7 @@ class BuildTree(scriptstree.ScriptTree, object):
         if not node_name:
             return
 
-        node_path = current_rig.create_build_node(
-            builder_node=builder_node, name=node_name, description=description, unique_name=True)
+        node_path = current_rig.create_build_node(builder_node=builder_node, name=node_name, unique_name=True)
         if not node_path:
             tpRigToolkit.logger.error('Impossible to create new node!')
             return

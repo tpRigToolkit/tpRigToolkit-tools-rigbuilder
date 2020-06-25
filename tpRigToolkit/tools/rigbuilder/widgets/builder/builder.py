@@ -169,21 +169,19 @@ class RigBuilder(treewidgets.EditFileTreeWidget, object):
         self.tree_widget.refresh(sync=True)
         self.tree_widget.selectionModel().clearSelection()
 
-    def create_builder_node(self, builder_node, name=None, description=None):
+    def create_builder_node(self, builder_node, name=None):
         """
         Function that creates a new builder node of the current selected node
         :param builder_node:
         :param name:
-        :param description:
         """
 
-        return self.tree_widget.create_builder_node(
-            builder_node=builder_node, name=name, description=description)
+        return self.tree_widget.create_builder_node(builder_node=builder_node, name=name)
 
 
 class NodeBuilderCreator(base.BaseWidget, object):
 
-    nodeCreated = Signal(object, str, str, object)
+    nodeCreated = Signal(object, str, object)
     creationCanceled = Signal()
 
     def __init__(self, parent=None):
@@ -209,13 +207,8 @@ class NodeBuilderCreator(base.BaseWidget, object):
         display_name_lbl = QLabel('Display Name:')
         self._display_name_line = QLineEdit()
         self._display_name_line.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        description_lbl = QLabel('Description:')
-        self._description_name_line = QLineEdit()
-        self._description_name_line.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         grid_layout.addWidget(display_name_lbl, 0, 0, Qt.AlignRight)
         grid_layout.addWidget(self._display_name_line, 0, 1)
-        grid_layout.addWidget(description_lbl, 1, 0, Qt.AlignRight)
-        grid_layout.addWidget(self._description_name_line, 1, 1)
         grid_main_layout.addLayout(grid_layout)
 
         self.main_layout.addWidget(grid_main_widget)
@@ -257,7 +250,6 @@ class NodeBuilderCreator(base.BaseWidget, object):
 
     def reset(self):
         self._display_name_line.setText('')
-        self._description_name_line.setText('')
 
     def refresh(self):
         self._nodes_tree.refresh()
@@ -269,6 +261,5 @@ class NodeBuilderCreator(base.BaseWidget, object):
             return
 
         node_display_name = self._display_name_line.text()
-        node_description = self._description_name_line.text()
 
-        self.nodeCreated.emit(selected_node, node_display_name, node_description, self._build_node)
+        self.nodeCreated.emit(selected_node, node_display_name, self._build_node)
