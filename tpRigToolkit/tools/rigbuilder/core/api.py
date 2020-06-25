@@ -72,19 +72,18 @@ def solve_name(*args, **kwargs):
     return solved_name
 
 
-def parse_name(node_name, rule_name=None, ):
+def parse_name(node_name, rule_name=None):
     """
     Parse a current solved name and return its different fields (metadata information)
     :param node_name: str
     :param rule_name: str
-    :param use_auto_suffix: bool
     :return: dict(str)
     """
 
     return tpRigToolkit.NamesMgr().parse_name(node_name=node_name, rule_name=rule_name)
 
 
-def get_sides():
+def get_sides(skip_default=False):
     """
     Returns sides being used
     This is the order that is used to check the list of available sides
@@ -102,6 +101,8 @@ def get_sides():
             sides = current_project.get_option('sides')
             if sides:
                 default_side = sides[0]
+                if skip_default:
+                    sides.remove(default_side)
                 return sides, default_side
         # Check project nomenclature
         name_lib = current_project.naming_lib
@@ -114,6 +115,31 @@ def get_sides():
     else:
         # Default fallback
         return consts.DEFAULT_SIDES, consts.DEFAULT_SIDE
+
+
+def get_mirror_side():
+    """
+    Returns current mirror side used by the project
+    :return: str
+    """
+
+    current_project = rigbuilder.project
+    if current_project:
+        # Check project options
+        if current_project.has_option('mirror side'):
+            return current_project.get_option('mirror side')
+
+        # Check project nomenclature
+        name_lib = current_project.naming_lib
+        mirror_side_token = name_lib.get_token('mirror side')
+        if mirror_side_token:
+            token_items = mirror_side_token.get_items().keys()
+            token_default = mirror_side_token.default or 1
+            token_default_value = token_items[token_default - 1] if token_items else ''
+            return token_default_value
+    else:
+        # Default fallback
+        return consts.DEFAULT_MIRROR_SIDE
 
 
 def get_default_side():
@@ -153,3 +179,25 @@ def get_color_of_side(side, sub_color=False):
             return side_color
     else:
         return tp.Dcc.get_color_of_side(side=side, sub_color=sub_color)
+
+
+def get_mirror_name(node_name):
+    """
+    Returns the mirrored name of the given node
+    :param node_name: str
+    :return: str
+    """
+
+    all_sides, default_side = get_sides(skip_default=True)
+    parsed_name = parse_name(node_name)
+    if 'side' not in parsed_name or not parsed_name['side'] or parsed_name['side'] not in all_sides:
+        return tp.Dcc.get_mirror_name(node_name)
+    else:
+        mirror_side = parsed_name['side']
+        for side in all_sides:
+            if side != parsed_name['side']:
+                mirror_side = side
+                break
+        parsed_name['side'] = mirror_side
+
+        return solve_name(parsed_name)
