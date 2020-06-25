@@ -14,7 +14,6 @@ __email__ = "tpovedatd@gmail.com"
 
 import sys
 import string
-import logging
 import traceback
 
 import tpDcc as tp
@@ -22,10 +21,9 @@ from tpDcc.core import scripts
 from tpDcc.libs.python import log, osplatform, python, folder, fileio, timers, version
 from tpDcc.libs.python import path as path_utils, name as name_utils
 
+import tpRigToolkit
 from tpRigToolkit.tools.rigbuilder.core import consts, utils, data
 from tpRigToolkit.tools.rigbuilder.objects import helpers, base
-
-LOGGER = logging.getLogger('tpRigToolkit')
 
 
 class ScriptStatus(object):
@@ -41,6 +39,7 @@ class ScriptObject(base.BaseObject, object):
     MANIFEST_FOLDER = consts.MANIFEST_FOLDER
     SCRIPT_EXTENSION = scripts.ScriptPythonData.get_data_extension()
     DESCRIPTION = 'script'
+    BUILD_STEPS = [consts.BuildLevel.MAIN]
 
     def __init__(self, name=None):
 
@@ -133,10 +132,11 @@ class ScriptObject(base.BaseObject, object):
                 script_name = fileio.remove_extension(scripts_list[i])
                 script_path = self._get_code_file(script_name)
                 if not path_utils.is_file(script_path):
-                    LOGGER.warning('Script "{}" does not exists in proper path: {}'.format(script_name, script_path))
+                    tpRigToolkit.logger.warning(
+                        'Script "{}" does not exists in proper path: {}'.format(script_name, script_path))
                     continue
                 if scripts_list[i] in synced_scripts:
-                    LOGGER.warning(
+                    tpRigToolkit.logger.warning(
                         'Script "{}" is already synced. Do you have scripts with duplicates names?'.format(script_name))
                     continue
 
@@ -196,7 +196,7 @@ class ScriptObject(base.BaseObject, object):
 
         if name in self._runtime_values:
             value = self._runtime_values[name]
-            LOGGER.debug('Accessed - Runtime Variable: {}, value: {}'.format(name, value))
+            tpRigToolkit.logger.debug('Accessed - Runtime Variable: {}, value: {}'.format(name, value))
             return value
 
     def get_runtime_value_keys(self):
@@ -214,7 +214,7 @@ class ScriptObject(base.BaseObject, object):
         :param value: variant, list, tuple, float, int, etc, value of the script
         """
 
-        LOGGER.debug('Created Runtime Variable: {}, value: {}'.format(name, value))
+        tpRigToolkit.logger.debug('Created Runtime Variable: {}, value: {}'.format(name, value))
         self._runtime_values[name] = value
 
     def set_runtime_dict(self, dict_value):
@@ -254,10 +254,10 @@ class ScriptObject(base.BaseObject, object):
         module = None
         orig_script = script
 
-        log.start_temp_log(LOGGER.name)
+        log.start_temp_log(tpRigToolkit.logger.name)
 
         self._reset_builtin(**kwargs)
-        tp.Dcc.enable_undo()
+        # tp.Dcc.enable_undo()
         init_passed = False
 
         try:
@@ -266,7 +266,7 @@ class ScriptObject(base.BaseObject, object):
                 script = self._get_code_file(script)
             if not path_utils.is_file(script):
                 self._reset_builtin(**kwargs)
-                LOGGER.warning('Could not find script: {}'.format(orig_script))
+                tpRigToolkit.logger.warning('Could not find script: {}'.format(orig_script))
                 return
             auto_focus = False
             if settings:
@@ -282,24 +282,27 @@ class ScriptObject(base.BaseObject, object):
                     if external_code_path not in sys.path:
                         sys.path.append(external_code_path)
 
-            LOGGER.info('\n------------------------------------------------')
-            LOGGER.debug('START\t{}\n\n'.format(basename))
+            tpRigToolkit.logger.info('\n------------------------------------------------')
+            tpRigToolkit.logger.debug('START\t{}\n\n'.format(basename))
 
             module, init_passed, status = self._source_script(script, **kwargs)
         except Exception as exc:
-            LOGGER.warning('{} did not source! {}'.format(script, exc))
+            if not hard_error:
+                tpRigToolkit.logger.warning('{} did not source! {}'.format(script, exc))
+            else:
+                tpRigToolkit.logger.warning('{} did not source!'.format(script))
+
             status = traceback.format_exc()
             init_passed = False
             if hard_error:
-                tp.Dcc.disable_undo()
+                # tp.Dcc.disable_undo()
                 self._reset_builtin(**kwargs)
                 if module:
                     try:
                         del module
                     except Exception:
-                        LOGGER.warning('Could not delete module: {}!'.format(module))
-                    LOGGER.error('{}\n'.format(status))
-                    raise
+                        tpRigToolkit.logger.warning('Could not delete module: {}!'.format(module))
+                raise
         finally:
             if init_passed:
                 if module:
@@ -313,21 +316,21 @@ class ScriptObject(base.BaseObject, object):
                         status = traceback.format_exc()
                         self._reset_builtin(**kwargs)
                         if hard_error:
-                            tp.Dcc.disable_undo()
-                            LOGGER.error('{}\n'.format(status))
+                            # tp.Dcc.disable_undo()
+                            tpRigToolkit.logger.error('{}\n'.format(status))
                             raise
 
-            tp.Dcc.disable_undo()
+            # tp.Dcc.disable_undo()
 
         if module:
             del module
         self._reset_builtin(**kwargs)
 
         if not status == ScriptStatus.SUCCESS:
-            LOGGER.debug('{}\n'.format(status))
+            tpRigToolkit.logger.debug('{}\n'.format(status))
 
-        LOGGER.info('\nEND\t{}\n\n'.format(basename))
-        log.end_temp_log(LOGGER.name)
+        tpRigToolkit.logger.debug('\nEND\t{}\n\n'.format(basename))
+        log.end_temp_log(tpRigToolkit.logger.name)
 
         return status
 
@@ -338,7 +341,7 @@ class ScriptObject(base.BaseObject, object):
 
         prev_script = osplatform.get_env_var('RIGBUILDER_CURRENT_SCRIPT')
         osplatform.set_env_var('RIGBUILDER_CURRENT_SCRIPT', self.get_path())
-        LOGGER.info('---------------------------------------------------------------')
+        tpRigToolkit.logger.info('---------------------------------------------------------------')
 
         watch = timers.StopWatch()
         watch.start(feedback=False)
@@ -357,11 +360,11 @@ class ScriptObject(base.BaseObject, object):
             if tp.Dcc.is_batch():
                 msg = '\n\n\nRunning {} Scripts\n\n'.format(name)
 
-        LOGGER.info(msg)
-        LOGGER.debug('\n\nScript Path: {}'.format(self.get_path()))
-        LOGGER.debug('Option Path: {}'.format(self.get_option_file()))
-        LOGGER.debug('Settings Path: {}'.format(self.get_settings_file()))
-        LOGGER.debug('Runtime Values: {}\n\n'.format(self._runtime_values))
+        tpRigToolkit.logger.info(msg)
+        tpRigToolkit.logger.debug('\n\nScript Path: {}'.format(self.get_path()))
+        tpRigToolkit.logger.debug('Option Path: {}'.format(self.get_option_file()))
+        tpRigToolkit.logger.debug('Settings Path: {}'.format(self.get_settings_file()))
+        tpRigToolkit.logger.debug('Runtime Values: {}\n\n'.format(self._runtime_values))
 
         scripts, states = self.get_scripts_manifest()
 
@@ -373,51 +376,59 @@ class ScriptObject(base.BaseObject, object):
             progress_bar = tp.Dcc.get_progress_bar_class()('Process', len(scripts))
             progress_bar.status('Processing: getting ready ...')
 
+        hard_error = kwargs.get('hard_error', True)
+
         status_list = list()
-        for i in range(len(scripts)):
-            state = states[i]
-            script = scripts[i]
-            status = ScriptStatus.SKIPPED
-            check_script = script[:-3]
-            state_dict[check_script] = state
-            if progress_bar:
-                progress_bar.status('Processing: {}'.format(script))
-                if progress_bar.break_signaled():
-                    if osplatform.get_env_var('RIGBUILDER_RUN') == 'True':
-                        osplatform.set_env_var('RIGBULIDER_STOP', True)
-                    break
+        for build_level in self.BUILD_STEPS:
+            for i in range(len(scripts)):
+                state = states[i]
+                script = scripts[i]
+                status = ScriptStatus.SKIPPED
+                check_script = script[:-3]
+                state_dict[check_script] = state
+                if progress_bar:
+                    progress_bar.status('Processing: {}'.format(script))
+                    if progress_bar.break_signaled():
+                        if osplatform.get_env_var('RIGBUILDER_RUN') == 'True':
+                            osplatform.set_env_var('RIGBULIDER_STOP', True)
+                        break
 
-            if state:
-                parent_state = True
-                for key in state_dict:
-                    if script.find(key) > -1:
-                        parent_state = state_dict[key]
-                        if not parent_state:
-                            break
+                if state:
+                    parent_state = True
+                    for key in state_dict:
+                        if script.find(key) > -1:
+                            parent_state = state_dict[key]
+                            if not parent_state:
+                                break
 
-                if not parent_state:
-                    LOGGER.warning('Skipping: {}\n\n'.format(script))
-                    if progress_bar:
-                        progress_bar.inc()
-                    continue
+                    if not parent_state:
+                        tpRigToolkit.logger.warning('Skipping: {}\n\n'.format(script))
+                        if progress_bar:
+                            progress_bar.inc()
+                        continue
 
-                try:
-                    status = self.run_script(script, hard_error=False, **kwargs)
-                except Exception as exc:
-                    LOGGER.error('Error while executing script: {} | {}'.format(exc, traceback.format_exc()))
-                    status = ScriptStatus.FAIL
+                    kwargs['build_level'] = build_level
 
-                if not status == ScriptStatus.SUCCESS:
-                    scripts_with_error.append(script)
+                    try:
+                        status = self.run_script(script, hard_error=hard_error, **kwargs)
+                    except Exception as exc:
+                        status = ScriptStatus.FAIL
+                    finally:
+                        if not status == ScriptStatus.SUCCESS and status is not True:
+                            error_msg = 'Error while executing script: {}'.format(traceback.format_exc())
+                            scripts_with_error.append(script)
+                            tpRigToolkit.logger.error(error_msg)
+                            if hard_error:
+                                raise Exception('Execution was forced to stop because something went wrong!')
 
-            if not states[i]:
-                LOGGER.warning('\n---------------------------------------------')
-                LOGGER.warning('Skipping: {}\n\n'.format(script))
+                if not states[i]:
+                    tpRigToolkit.logger.warning('\n---------------------------------------------')
+                    tpRigToolkit.logger.warning('Skipping: {}\n\n'.format(script))
 
-            if progress_bar:
-                progress_bar.inc()
+                if progress_bar:
+                    progress_bar.inc()
 
-            status_list.append([script, status])
+                status_list.append([script, status])
 
         minutes, seconds = watch.stop()
 
@@ -425,19 +436,19 @@ class ScriptObject(base.BaseObject, object):
             progress_bar.end()
 
         if scripts_with_error:
-            LOGGER.error('\n\n\nThe following scripts error during build:\n')
+            tpRigToolkit.logger.error('\n\n\nThe following scripts error during build:\n')
             for script in scripts_with_error:
-                LOGGER.error('\n' + script)
+                tpRigToolkit.logger.error('\n' + script)
 
         if minutes is None:
-            LOGGER.info('\n\n\nProcess build in {} seconds.\n\n'.format(seconds))
+            tpRigToolkit.logger.info('\n\n\nProcess build in {} seconds.\n\n'.format(seconds))
         else:
-            LOGGER.info('\n\n\nProcess build in {} minutes, {} seconds'.format(minutes, seconds))
+            tpRigToolkit.logger.info('\n\n\nProcess build in {} minutes, {} seconds'.format(minutes, seconds))
 
-        LOGGER.debug('\n\n')
+        tpRigToolkit.logger.debug('\n\n')
         for status_entry in status_list:
-            LOGGER.debug('{} : {}'.format(status_entry[1], status_entry[0]))
-        LOGGER.debug('\n\n')
+            tpRigToolkit.logger.debug('{} : {}'.format(status_entry[1], status_entry[0]))
+        tpRigToolkit.logger.debug('\n\n')
 
         osplatform.set_env_var('RIGBUILDER_CURRENT_SCRIPT', prev_script)
 
@@ -487,17 +498,17 @@ class ScriptObject(base.BaseObject, object):
             exec(script, globals(), builtins)
             status = ScriptStatus.SUCCESS
         except Exception:
-            LOGGER.warning('Script Error! : {}!'.format(script))
+            tpRigToolkit.logger.warning('Script Error! : {}!'.format(script))
             status = traceback.format_exc()
             if hard_error:
                 tp.Dcc.disable_undo()
-            LOGGER.error('{}\n'.format(status))
+            tpRigToolkit.logger.error('{}\n'.format(status))
             raise
 
         tp.Dcc.disable_undo()
 
         if not status == ScriptStatus.SUCCESS:
-            LOGGER.info('{}\n'.format(status))
+            tpRigToolkit.logger.info('{}\n'.format(status))
 
         return status
 
@@ -517,7 +528,7 @@ class ScriptObject(base.BaseObject, object):
             try:
                 self.create_code(self.MANIFEST_FILE, consts.DataTypes.Manifest)
             except RuntimeError:
-                LOGGER.warning(
+                tpRigToolkit.logger.warning(
                     'Could not create script manifest file in folder: {} | {}'.format(
                         manifest_path, traceback.format_exc()))
 
@@ -536,7 +547,7 @@ class ScriptObject(base.BaseObject, object):
             try:
                 self.create_code(self.MANIFEST_FILE, scripts.ScriptManifestData.get_data_extension())
             except RuntimeError:
-                LOGGER.warning(
+                tpRigToolkit.logger.warning(
                     'Could not create script manifest file: {} | {}'.format(manifest_file, traceback.format_exc()))
 
         return manifest_file
@@ -840,7 +851,7 @@ class ScriptObject(base.BaseObject, object):
 
         code_file = self._get_code_file(name=name, basename=basename)
         if not path_utils.exists(code_file):
-            LOGGER.warning('Code File: "{}" does not exists!'.format(code_file))
+            tpRigToolkit.logger.warning('Code File: "{}" does not exists!'.format(code_file))
             return
 
         return code_file
@@ -903,7 +914,7 @@ class ScriptObject(base.BaseObject, object):
         data_folder.set_data_type(data_type)
         data_inst = data_folder.get_folder_data_instance()
         if not data_inst:
-            LOGGER.warning('Impossible to create data of type {} because that data is not supported!'.format(data_type))
+            tpRigToolkit.logger.warning('Impossible to create data of type {} because that data is not supported!'.format(data_type))
             return
 
         if name == consts.MANIFEST_FILE:
@@ -978,7 +989,7 @@ class ScriptObject(base.BaseObject, object):
         new_len = new_name.count('/')
 
         if old_len != new_len:
-            LOGGER.warning('Rename works on code folder in the same folder. Try to move instead!')
+            tpRigToolkit.logger.warning('Rename works on code folder in the same folder. Try to move instead!')
             return
 
         sub_new_name = path_utils.remove_common_path(old_name, new_name)
@@ -1046,7 +1057,7 @@ class ScriptObject(base.BaseObject, object):
         self._reset_builtin(**kwargs)
         helpers.ScriptHelpers.setup_code_builtins(self, **kwargs)
 
-        LOGGER.info('Sourcing: {}'.format(script))
+        tpRigToolkit.logger.info('Sourcing: {}'.format(script))
 
         module = python.source_python_module(script)
         status = None
@@ -1079,4 +1090,4 @@ class ScriptObject(base.BaseObject, object):
                     tp.Dcc.clear_selection()
                     tp.Dcc.fit_view(animation=True)
                 except Exception:
-                    LOGGER.warning('Could not center view!')
+                    tpRigToolkit.logger.warning('Could not center view!')

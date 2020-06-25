@@ -148,7 +148,7 @@ class ObjectsHelpers(object):
 class ScriptHelpers(ObjectsHelpers, object):
 
     @staticmethod
-    def get_code_builtins(build_object, rig_object=None, project=None):
+    def get_code_builtins(build_object, rig_object=None, project=None, **kwargs):
         """
         Returns all current code builtins of the given script object
         :param build_object: BuildObject
@@ -187,7 +187,7 @@ class ScriptHelpers(ObjectsHelpers, object):
             exec '__builtin__.%s = builtin_value' % builtin
 
     @staticmethod
-    def reset_code_bultins(script_object, rig_object=None, project=None):
+    def reset_code_bultins(script_object, rig_object=None, project=None, **kwargs):
         """
         Reset given rig builtins
         :param script_object: ScriptObject
@@ -196,7 +196,7 @@ class ScriptHelpers(ObjectsHelpers, object):
         """
 
         builtins = ScriptHelpers.get_code_builtins(
-            script_object, rig_object=rig_object, project=project)
+            script_object, rig_object=rig_object, project=project, **kwargs)
         for builtin in builtins:
             try:
                 exec ('del(__builtin__.{}'.format(builtin))

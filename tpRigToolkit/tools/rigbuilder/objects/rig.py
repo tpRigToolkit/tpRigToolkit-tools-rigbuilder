@@ -29,6 +29,7 @@ class RigObject(script.ScriptObject, object):
     NODE_FOLDER = consts.NODE_FOLDER
     ENABLE_FILE = consts.ENABLE_FILE
     SCRIPT_EXTENSION = 'yml'
+    BUILD_STEPS = [consts.BuildLevel.PRE, consts.BuildLevel.MAIN, consts.BuildLevel.POST]
 
     def __init__(self, name=None):
 
@@ -105,7 +106,6 @@ class RigObject(script.ScriptObject, object):
         if is_python_script:
             return super(RigObject, self)._source_script(script, **kwargs)
         else:
-
             tpRigToolkit.logger.info('Sourcing: {}'.format(script))
             code_path = self.get_code_path()
             node_path = path_utils.remove_common_path_at_beginning(code_path, script)
@@ -113,7 +113,16 @@ class RigObject(script.ScriptObject, object):
             builder_node_inst = self.get_build_node_instance(node_name)
             init_passed = False
             if builder_node_inst:
-                init_passed = builder_node_inst.run()
+                build_level = kwargs.get('build_level', None)
+                if build_level:
+                    if build_level == consts.BuildLevel.PRE:
+                        init_passed = builder_node_inst.pre_run()
+                    elif build_level == consts.BuildLevel.MAIN:
+                        init_passed = builder_node_inst.run()
+                    elif build_level == consts.BuildLevel.POST:
+                        init_passed = builder_node_inst.post_run()
+                else:
+                    init_passed = builder_node_inst.run()
                 self._run_nodes[node_name] = builder_node_inst
 
             return None, init_passed, init_passed
@@ -371,7 +380,7 @@ class RigObject(script.ScriptObject, object):
     # ======================== NODE
     # ================================================================================================
 
-    def create_build_node(self, builder_node, name, description=None, unique_name=True):
+    def create_build_node(self, builder_node, name, unique_name=True):
         """
         Creates a new node for current rig
         :param builder_node:

@@ -20,8 +20,8 @@ from tpRigToolkit.tools.rigbuilder.core import tool
 from tpRigToolkit.tools.rigbuilder.widgets.base import options
 from tpRigToolkit.tools.rigbuilder.widgets.builder import builder
 from tpRigToolkit.tools.rigbuilder.widgets.rig import rigoutliner
-from tpRigToolkit.tools.rigbuilder.widgets.blueprint import blueprintseditor, blueprint
-from tpRigToolkit.tools.rigbuilder.widgets.puppeteer import puppeteer
+# from tpRigToolkit.tools.rigbuilder.widgets.blueprint import blueprintseditor, blueprint
+# from tpRigToolkit.tools.rigbuilder.widgets.puppeteer import puppeteer
 from tpRigToolkit.tools.rigbuilder.objects import rig
 from tpRigToolkit.tools.rigbuilder.tools import datalibrary, controls, properties, puppeteer as puppet_tools
 from tpRigToolkit.tools.rigbuilder.tools import buildnodeslibrary, blueprintslibrary, renamer, connection
@@ -509,6 +509,7 @@ class HubWidget(window.BaseWindow, object):
             self._builder.set_rig(None)
             # self._builder_creator.set_rig(None)
             self._builder.refresh()
+            # self._build_graph.clear()
             self._outliner_options.clear_options()
             return
 
@@ -529,6 +530,8 @@ class HubWidget(window.BaseWindow, object):
 
         self._builder.refresh()
 
+        # self._build_graph.add_nodes(self._builder.tree_widget.get_all_builder_nodes())
+
     def _refresh_selected_builder_node(self):
         """
         Internal callback function that is called when a builder node is selected in the builder node tree
@@ -545,12 +548,14 @@ class HubWidget(window.BaseWindow, object):
         if not builder_nodes:
             properties_widget.clear()
             properties_widget.set_object(None)
+            self._current_builder_item = None
             return
 
         item = builder_nodes[0]
         if item.matches(self._current_builder_item):
             return
         item_node = item.node
+        self._current_builder_item = item
 
         properties_widget.clear(update_stack=False)
         properties_widget.set_object(item_node)
@@ -591,7 +596,7 @@ class HubWidget(window.BaseWindow, object):
 
         self._stack.setCurrentIndex(0)
 
-    def _on_builder_node_created(self, builder_node, name, description, parent_node):
+    def _on_builder_node_created(self, builder_node, name, parent_node):
         """
         Internal callback function that is called when a new builder node is created by the user
         :param builder_node:
@@ -612,7 +617,7 @@ class HubWidget(window.BaseWindow, object):
                         name = '{}/{}/{}'.format(parent_path, parent_name, name)
                 else:
                     name = '{}/{}'.format(parent_name, name)
-            self._builder.create_builder_node(builder_node, name=name, description=description)
+            self._builder.create_builder_node(builder_node, name=name)
         self._stack.setCurrentIndex(0)
 
     def _on_puppet_removed(self):
