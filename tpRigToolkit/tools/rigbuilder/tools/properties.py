@@ -10,8 +10,7 @@ from __future__ import print_function, division, absolute_import
 from Qt.QtCore import *
 from Qt.QtWidgets import *
 
-from tpDcc.libs.python import decorators
-from tpDcc.libs.qt.widgets import label, stack, loading
+from tpDcc.libs.qt.widgets import label, stack
 
 from tpRigToolkit.tools.rigbuilder.core import tool
 from tpRigToolkit.tools.rigbuilder.widgets.base import options
@@ -46,25 +45,7 @@ class PropertiesTool(tool.DockTool, object):
             self._created = True
 
     def _create_ui(self):
-        self._stack = stack.SlidingStackedWidget()
-
-        loading_widget = QWidget()
-        loading_lyt = QVBoxLayout()
-        loading_widget.setLayout(loading_lyt)
-        self._loading = loading.CircleLoading(size=40)
-        loading_lbl_lyt = QHBoxLayout()
-        loading_lbl = label.BaseLabel('Loading properties. Please wait ...')
-        loading_lbl_lyt.addStretch()
-        loading_lbl_lyt.addWidget(loading_lbl)
-        loading_lbl_lyt.addStretch()
-        loading_lyt2 = QHBoxLayout()
-        loading_lyt2.addStretch()
-        loading_lyt2.addWidget(self._loading)
-        loading_lyt2.addStretch()
-        loading_lyt.addStretch()
-        loading_lyt.addLayout(loading_lyt2)
-        loading_lyt.addLayout(loading_lbl_lyt)
-        loading_lyt.addStretch()
+        self._stack = stack.SlidingStackedWidget(speed=250)
 
         self._lbl_widget = QWidget()
         lbl_lyt = QHBoxLayout()
@@ -77,7 +58,6 @@ class PropertiesTool(tool.DockTool, object):
         self._options_widget.hide_edit_widget()
 
         self._stack.addWidget(self._lbl_widget)
-        self._stack.addWidget(loading_widget)
         self._stack.addWidget(self._options_widget)
 
         self._content_layout.addWidget(self._stack)
@@ -94,24 +74,22 @@ class PropertiesTool(tool.DockTool, object):
             self._options_widget.get_option_object().load_options()
             self._options_widget.update_options()
 
-    @decorators.timestamp
     def set_object(self, object):
         self._object = object
         if not self._object:
             self._stack.slide_in_index(0)
         else:
+            if self._stack.currentIndex() == 1:
+                self._on_refresh()
             self._stack.slide_in_index(1)
 
-    def _on_refresh(self, index):
-        if index == 2:
-            return
-
+    def _on_refresh(self, index=None):
         self._options_widget.set_option_object(self._object, force_update=False)
         self.refresh()
-        if index == 0:
+        if index is None or index == 0:
             return
         if self._object:
-            self._stack.slide_in_index(2)
+            self._stack.slide_in_index(1)
         else:
             self._stack.slide_in_index(0)
 
